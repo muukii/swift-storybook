@@ -9,6 +9,7 @@ struct BookSidebarCatalogView: View {
   private static let userDefaults = UserDefaults(suiteName: "jp.eure.storybook2") ?? .standard
 
   @ObservedObject private var store: BookStore
+  @StateObject private var thumbnailCache = StorybookThumbnailCache()
   @Environment(\.colorScheme) private var inheritedColorScheme
   @Environment(\.storybook_targetViewController) private var targetViewController
   @AppStorage("autoOpenLastPage", store: BookSidebarCatalogView.userDefaults)
@@ -51,10 +52,10 @@ struct BookSidebarCatalogView: View {
         if let selection {
           BookPageDestination(page: selection.page)
         } else {
-          ContentUnavailableView(
-            "Select a Preview",
-            systemImage: "sidebar.left",
-            description: Text("Choose a preview from the sidebar.")
+          StorybookThumbnailGallery(
+            nodes: query.isEmpty ? store.book.contents : results,
+            cache: thumbnailCache,
+            onSelect: reveal
           )
           .navigationTitle(store.title)
         }
@@ -169,6 +170,15 @@ struct BookSidebarCatalogView: View {
     .navigationTitle(store.title)
     .searchable(text: $query, placement: .sidebar, prompt: "Search Previews")
     .toolbar {
+      ToolbarItem {
+        Button {
+          selection = nil
+        } label: {
+          Label("Thumbnails", systemImage: "square.grid.2x2")
+        }
+        .help("Show Thumbnail Catalog")
+        .accessibilityIdentifier("storybook.catalog.thumbnails")
+      }
       ToolbarItem {
         Button {
           showSettings = true
