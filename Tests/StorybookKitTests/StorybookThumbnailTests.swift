@@ -199,6 +199,60 @@ struct StorybookThumbnailTests {
     #expect(StorybookThumbnailGallery.entries(in: []).isEmpty)
   }
 
+  #if canImport(UIKit)
+    @Test("Native scrolling content uses the bounded viewport in both appearances")
+    func nativeScrollView() throws {
+      let page = page {
+        .uiView {
+          let root = UIView()
+          root.backgroundColor = .systemBackground
+          let scrollView = UIScrollView()
+          let stack = UIStackView()
+          stack.axis = .vertical
+          stack.spacing = 12
+          root.addSubview(scrollView)
+          scrollView.translatesAutoresizingMaskIntoConstraints = false
+          NSLayoutConstraint.activate([
+            scrollView.leadingAnchor.constraint(equalTo: root.leadingAnchor),
+            scrollView.trailingAnchor.constraint(equalTo: root.trailingAnchor),
+            scrollView.topAnchor.constraint(equalTo: root.topAnchor),
+            scrollView.bottomAnchor.constraint(equalTo: root.bottomAnchor),
+          ])
+          scrollView.addSubview(stack)
+          stack.translatesAutoresizingMaskIntoConstraints = false
+          NSLayoutConstraint.activate([
+            stack.leadingAnchor.constraint(
+              equalTo: scrollView.contentLayoutGuide.leadingAnchor, constant: 20),
+            stack.trailingAnchor.constraint(
+              equalTo: scrollView.contentLayoutGuide.trailingAnchor, constant: -20),
+            stack.topAnchor.constraint(
+              equalTo: scrollView.contentLayoutGuide.topAnchor, constant: 20),
+            stack.bottomAnchor.constraint(
+              equalTo: scrollView.contentLayoutGuide.bottomAnchor, constant: -20),
+            stack.widthAnchor.constraint(
+              equalTo: scrollView.frameLayoutGuide.widthAnchor, constant: -40),
+          ])
+          for _ in 0..<10 {
+            let section = UIView()
+            section.backgroundColor = .blue
+            section.heightAnchor.constraint(equalToConstant: 120).isActive = true
+            stack.addArrangedSubview(section)
+          }
+          return root
+        }
+      }
+      let cache = StorybookThumbnailCache()
+      for colorScheme in [ColorScheme.light, .dark, .light] {
+        let renderedImage = try image(cache.thumbnail(for: page, colorScheme: colorScheme))
+        #expect(renderedImage.size == StorybookThumbnailRenderer.size)
+        let color = try pixel(in: renderedImage)
+        #expect(color[2] > 230)
+        #expect(color[0] < 25)
+        #expect(color[1] < 25)
+      }
+    }
+  #endif
+
   private func image(_ thumbnail: StorybookThumbnail) throws -> StorybookThumbnailImage {
     guard case .image(let image) = thumbnail else {
       if case .unavailable(let reason) = thumbnail { Issue.record("\(reason)") }

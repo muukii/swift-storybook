@@ -142,6 +142,9 @@ enum StorybookThumbnailRenderer {
 
     func sizeThatFits(_ proposal: ProposedViewSize, uiView: UIView, context: Context) -> CGSize? {
       let limit = proposal.replacingUnspecifiedDimensions(by: StorybookThumbnailRenderer.size)
+      if containsScrollView(uiView) {
+        return limit
+      }
       let fitted = uiView.systemLayoutSizeFitting(UIView.layoutFittingCompressedSize)
       let natural = uiView.sizeThatFits(limit)
       func dimension(_ values: CGFloat..., limit: CGFloat) -> CGFloat {
@@ -151,6 +154,10 @@ enum StorybookThumbnailRenderer {
         width: dimension(fitted.width, natural.width, uiView.bounds.width, limit: limit.width),
         height: dimension(fitted.height, natural.height, uiView.bounds.height, limit: limit.height)
       )
+    }
+
+    private func containsScrollView(_ view: UIView) -> Bool {
+      view is UIScrollView || view.subviews.contains(where: containsScrollView)
     }
   }
 #endif
