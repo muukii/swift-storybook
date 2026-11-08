@@ -1,10 +1,11 @@
 import SwiftUI
+
 #if canImport(UIKit)
-import UIKit
-typealias StorybookThumbnailImage = UIImage
+  import UIKit
+  typealias StorybookThumbnailImage = UIImage
 #elseif os(macOS)
-import AppKit
-typealias StorybookThumbnailImage = NSImage
+  import AppKit
+  typealias StorybookThumbnailImage = NSImage
 #endif
 
 enum StorybookThumbnail {
@@ -63,11 +64,11 @@ enum StorybookThumbnailRenderer {
     case .viewport(let makeView):
       content = makeView()
     #if canImport(UIKit)
-    case .uiView(let makeView):
-      content = AnyView(ThumbnailNativeView(makeView: makeView))
+      case .uiView(let makeView):
+        content = AnyView(ThumbnailNativeView(makeView: makeView))
     #elseif os(macOS)
-    case .nsView(let makeView):
-      content = AnyView(_ViewHost(instantiate: makeView))
+      case .nsView(let makeView):
+        content = AnyView(_ViewHost(instantiate: makeView))
     #endif
     case .presentedViewController:
       // Catalog generation must never present controllers over the user's UI.
@@ -85,11 +86,47 @@ enum StorybookThumbnailRenderer {
       )
     }
     do {
-      return .image(
-        try StorybookViewportRenderer.render(
-          viewport, width: size.width, scale: 1, appearance: appearance
-        ).image
-      )
+      #if canImport(UIKit)
+        let host = StorybookViewportHost(viewport: viewport, appearance: appearance)
+        let window: UIWindow
+        if let scene = UIApplication.shared.connectedScenes
+          .compactMap({ $0 as? UIWindowScene })
+          .first(where: { $0.activationState == .foregroundActive })
+        {
+          window = UIWindow(windowScene: scene)
+        } else {
+          window = UIWindow(frame: CGRect(origin: .zero, size: size))
+        }
+        window.frame = CGRect(origin: .zero, size: size)
+        window.windowLevel = .init(rawValue: UIWindow.Level.normal.rawValue - 1)
+        window.isUserInteractionEnabled = false
+        window.accessibilityElementsHidden = true
+        window.rootViewController = host
+        // Commit native layers without making the capture window key or covering the catalog.
+        window.isHidden = false
+        defer {
+          window.isHidden = true
+          window.rootViewController = nil
+        }
+        host.view.frame = window.bounds
+        host.view.setNeedsLayout()
+        host.view.layoutIfNeeded()
+        window.layoutIfNeeded()
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        return .image(
+          UIGraphicsImageRenderer(size: size, format: format).image { context in
+            if window.drawHierarchy(in: window.bounds, afterScreenUpdates: true) == false {
+              window.layer.render(in: context.cgContext)
+            }
+          })
+      #else
+        return .image(
+          try StorybookViewportRenderer.render(
+            viewport, width: size.width, scale: 1, appearance: appearance
+          ).image
+        )
+      #endif
     } catch {
       return .unavailable(error.localizedDescription)
     }
@@ -97,23 +134,23 @@ enum StorybookThumbnailRenderer {
 }
 
 #if canImport(UIKit)
-private struct ThumbnailNativeView: UIViewRepresentable {
-  let makeView: @MainActor () -> UIView
+  private struct ThumbnailNativeView: UIViewRepresentable {
+    let makeView: @MainActor () -> UIView
 
-  func makeUIView(context: Context) -> UIView { makeView() }
-  func updateUIView(_ uiView: UIView, context: Context) {}
+    func makeUIView(context: Context) -> UIView { makeView() }
+    func updateUIView(_ uiView: UIView, context: Context) {}
 
-  func sizeThatFits(_ proposal: ProposedViewSize, uiView: UIView, context: Context) -> CGSize? {
-    let limit = proposal.replacingUnspecifiedDimensions(by: StorybookThumbnailRenderer.size)
-    let fitted = uiView.systemLayoutSizeFitting(UIView.layoutFittingCompressedSize)
-    let natural = uiView.sizeThatFits(limit)
-    func dimension(_ values: CGFloat..., limit: CGFloat) -> CGFloat {
-      min(values.first { $0.isFinite && $0 > 0 } ?? limit, limit)
+    func sizeThatFits(_ proposal: ProposedViewSize, uiView: UIView, context: Context) -> CGSize? {
+      let limit = proposal.replacingUnspecifiedDimensions(by: StorybookThumbnailRenderer.size)
+      let fitted = uiView.systemLayoutSizeFitting(UIView.layoutFittingCompressedSize)
+      let natural = uiView.sizeThatFits(limit)
+      func dimension(_ values: CGFloat..., limit: CGFloat) -> CGFloat {
+        min(values.first { $0.isFinite && $0 > 0 } ?? limit, limit)
+      }
+      return CGSize(
+        width: dimension(fitted.width, natural.width, uiView.bounds.width, limit: limit.width),
+        height: dimension(fitted.height, natural.height, uiView.bounds.height, limit: limit.height)
+      )
     }
-    return CGSize(
-      width: dimension(fitted.width, natural.width, uiView.bounds.width, limit: limit.width),
-      height: dimension(fitted.height, natural.height, uiView.bounds.height, limit: limit.height)
-    )
   }
-}
 #endif

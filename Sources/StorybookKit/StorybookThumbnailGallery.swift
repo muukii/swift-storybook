@@ -30,7 +30,8 @@ struct StorybookThumbnailGallery: View {
             .buttonStyle(.plain)
             .accessibilityLabel(entry.page.title)
             .accessibilityHint("Open preview. \(entry.folderPath)")
-            .accessibilityIdentifier("storybook.thumbnail|\(entry.page.descriptor.accessibilityIdentifier)")
+            .accessibilityIdentifier(
+              "storybook.thumbnail|\(entry.page.descriptor.accessibilityIdentifier)")
           }
         }
         .padding(16)
@@ -66,9 +67,9 @@ private struct StorybookThumbnailCard: View {
         switch thumbnail {
         case .image(let image):
           #if canImport(UIKit)
-          Image(uiImage: image).resizable().scaledToFit()
+            Image(uiImage: image).resizable().scaledToFit()
           #elseif os(macOS)
-          Image(nsImage: image).resizable().scaledToFit()
+            Image(nsImage: image).resizable().scaledToFit()
           #endif
         case .unavailable:
           VStack(spacing: 8) {

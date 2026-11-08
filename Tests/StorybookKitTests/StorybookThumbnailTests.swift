@@ -1,12 +1,13 @@
 import SwiftUI
 import Testing
-#if canImport(UIKit)
-import UIKit
-#elseif os(macOS)
-import AppKit
-#endif
 
 @testable import StorybookKit
+
+#if canImport(UIKit)
+  import UIKit
+#elseif os(macOS)
+  import AppKit
+#endif
 
 @Suite("Thumbnail catalog")
 @MainActor
@@ -15,17 +16,21 @@ struct StorybookThumbnailTests {
   @Test("Snapshots have a bounded viewport even for very tall content")
   func boundedViewport() throws {
     let page = BookPage(title: "Tall") {
-      Color.red.frame(height: 10_000)
+      Color(red: 1, green: 0, blue: 0).frame(height: 10_000)
     }
     let renderedImage = try image(StorybookThumbnailRenderer.render(page: page, appearance: .light))
     #expect(renderedImage.size == StorybookThumbnailRenderer.size)
     #if os(macOS)
-    let bitmap = try #require(renderedImage.representations.first as? NSBitmapImageRep)
-    #expect(bitmap.pixelsWide == 480)
-    #expect(bitmap.pixelsHigh == 360)
-    let color = try #require(bitmap.colorAt(x: 240, y: 180)?.usingColorSpace(.deviceRGB))
-    #expect(color.redComponent > 0.9)
-    #expect(color.greenComponent < 0.1)
+      let bitmap = try #require(renderedImage.representations.first as? NSBitmapImageRep)
+      #expect(bitmap.pixelsWide == 480)
+      #expect(bitmap.pixelsHigh == 360)
+      let color = try #require(bitmap.colorAt(x: 240, y: 180)?.usingColorSpace(.deviceRGB))
+      #expect(color.redComponent > 0.9)
+      #expect(color.greenComponent < 0.1)
+    #else
+      let color = try pixel(in: renderedImage)
+      #expect(color[0] > 230)
+      #expect(color[1] < 25)
     #endif
   }
 
@@ -45,12 +50,36 @@ struct StorybookThumbnailTests {
     #expect(light !== dark)
     #expect(creations == 2)
     #if os(macOS)
-    let lightBitmap = try #require(light.representations.first as? NSBitmapImageRep)
-    let darkBitmap = try #require(dark.representations.first as? NSBitmapImageRep)
-    let lightColor = try #require(lightBitmap.colorAt(x: 240, y: 180)?.usingColorSpace(.deviceRGB))
-    let darkColor = try #require(darkBitmap.colorAt(x: 240, y: 180)?.usingColorSpace(.deviceRGB))
-    #expect(lightColor.redComponent > 0.9)
-    #expect(darkColor.redComponent < 0.1)
+      let lightBitmap = try #require(light.representations.first as? NSBitmapImageRep)
+      let darkBitmap = try #require(dark.representations.first as? NSBitmapImageRep)
+      let lightColor = try #require(
+        lightBitmap.colorAt(x: 240, y: 180)?.usingColorSpace(.deviceRGB))
+      let darkColor = try #require(darkBitmap.colorAt(x: 240, y: 180)?.usingColorSpace(.deviceRGB))
+      #expect(lightColor.redComponent > 0.9)
+      #expect(darkColor.redComponent < 0.1)
+    #else
+      #expect(try pixel(in: light)[0] > 230)
+      #expect(try pixel(in: dark)[0] < 25)
+    #endif
+  }
+
+  @Test("SwiftUI text survives the window-backed snapshot")
+  func textPixels() throws {
+    let text = BookPage(title: "Text") {
+      Text("Thumbnail").font(.system(size: 48)).foregroundStyle(Color.black)
+    }
+    let empty = BookPage(title: "Empty") { Color.white }
+    let textImage = try image(StorybookThumbnailRenderer.render(page: text, appearance: .light))
+    let emptyImage = try image(StorybookThumbnailRenderer.render(page: empty, appearance: .light))
+    #if canImport(UIKit)
+      #expect(try #require(textImage.pngData()) != #require(emptyImage.pngData()))
+    #else
+      let textBitmap = try #require(textImage.representations.first as? NSBitmapImageRep)
+      let emptyBitmap = try #require(emptyImage.representations.first as? NSBitmapImageRep)
+      #expect(
+        try #require(textBitmap.representation(using: .png, properties: [:]))
+          != #require(emptyBitmap.representation(using: .png, properties: [:]))
+      )
     #endif
   }
 
@@ -81,9 +110,9 @@ struct StorybookThumbnailTests {
       .presentedViewController {
         creations += 1
         #if canImport(UIKit)
-        return UIViewController()
+          return UIViewController()
         #else
-        return NSViewController()
+          return NSViewController()
         #endif
       }
     }
@@ -121,38 +150,31 @@ struct StorybookThumbnailTests {
   func nativeView() throws {
     let page = page {
       #if canImport(UIKit)
-      .uiView {
-        let view = UIView(frame: .init(x: 0, y: 0, width: 80, height: 40))
-        view.backgroundColor = .green
-        return view
-      }
+        .uiView {
+          let view = UIView(frame: .init(x: 0, y: 0, width: 80, height: 40))
+          view.backgroundColor = .green
+          return view
+        }
       #else
-      .nsView {
-        let view = NSView(frame: .init(x: 0, y: 0, width: 80, height: 40))
-        view.wantsLayer = true
-        view.layer?.backgroundColor = NSColor.green.cgColor
-        return view
-      }
+        .nsView {
+          let view = NSView(frame: .init(x: 0, y: 0, width: 80, height: 40))
+          view.wantsLayer = true
+          view.layer?.backgroundColor = NSColor.green.cgColor
+          return view
+        }
       #endif
     }
     let renderedImage = try image(StorybookThumbnailRenderer.render(page: page, appearance: .light))
     #expect(renderedImage.size == StorybookThumbnailRenderer.size)
     #if os(macOS)
-    let bitmap = try #require(renderedImage.representations.first as? NSBitmapImageRep)
-    let color = try #require(bitmap.colorAt(x: 240, y: 180)?.usingColorSpace(.deviceRGB))
-    #expect(color.greenComponent > 0.9)
-    #expect(color.redComponent < 0.1)
+      let bitmap = try #require(renderedImage.representations.first as? NSBitmapImageRep)
+      let color = try #require(bitmap.colorAt(x: 240, y: 180)?.usingColorSpace(.deviceRGB))
+      #expect(color.greenComponent > 0.9)
+      #expect(color.redComponent < 0.1)
     #else
-    let cgImage = try #require(renderedImage.cgImage)
-    let pixel = try #require(cgImage.cropping(to: .init(x: 240, y: 180, width: 1, height: 1)))
-    var bytes = [UInt8](repeating: 0, count: 4)
-    let context = try #require(CGContext(
-      data: &bytes, width: 1, height: 1, bitsPerComponent: 8, bytesPerRow: 4,
-      space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
-    ))
-    context.draw(pixel, in: .init(x: 0, y: 0, width: 1, height: 1))
-    #expect(bytes[1] > 230)
-    #expect(bytes[0] < 25)
+      let bytes = try pixel(in: renderedImage)
+      #expect(bytes[1] > 230)
+      #expect(bytes[0] < 25)
     #endif
   }
 
@@ -169,20 +191,37 @@ struct StorybookThumbnailTests {
     }
     let entries = StorybookThumbnailGallery.entries(in: [.folder(folder), .page(root)])
     #expect(entries.map(\.id) == [first.id, second.id, root.id])
-    #expect(entries.map(\.folderPath) == [
-      "Module / Components.swift", "Module / Components.swift", "",
-    ])
+    #expect(
+      entries.map(\.folderPath) == [
+        "Module / Components.swift", "Module / Components.swift", "",
+      ])
     #expect(StorybookThumbnailGallery.entries(in: [.page(second)]).map(\.id) == [second.id])
     #expect(StorybookThumbnailGallery.entries(in: []).isEmpty)
   }
 
   private func image(_ thumbnail: StorybookThumbnail) throws -> StorybookThumbnailImage {
     guard case .image(let image) = thumbnail else {
-      if case .unavailable(let reason) = thumbnail { Issue.record(reason) }
+      if case .unavailable(let reason) = thumbnail { Issue.record("\(reason)") }
       throw ThumbnailTestError.missingImage
     }
     return image
   }
+
+  #if canImport(UIKit)
+    private func pixel(in image: UIImage) throws -> [UInt8] {
+      let cgImage = try #require(image.cgImage)
+      let pixel = try #require(cgImage.cropping(to: .init(x: 240, y: 180, width: 1, height: 1)))
+      var bytes = [UInt8](repeating: 0, count: 4)
+      let context = try #require(
+        CGContext(
+          data: &bytes, width: 1, height: 1, bitsPerComponent: 8, bytesPerRow: 4,
+          space: CGColorSpaceCreateDeviceRGB(),
+          bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ))
+      context.draw(pixel, in: .init(x: 0, y: 0, width: 1, height: 1))
+      return bytes
+    }
+  #endif
 
   private func page(
     preview: @escaping @MainActor () -> StorybookViewPortPreview
