@@ -63,6 +63,23 @@ Even when Xcode previews work well, running Storybook as part of an app provides
 
 The same declaration continues to work as an Xcode preview, so your preview code becomes the source of truth for both development and the in-app catalog.
 
+### Thumbnail catalog
+
+The catalog shows previews as a thumbnail grid. Select a card to open the normal,
+interactive preview. On iOS, use the toolbar to switch between thumbnails and the
+existing folder list; the choice is remembered. On macOS, the sidebar remains
+available alongside the grid, and the **Thumbnails** toolbar button returns from
+a selected preview to the grid. Search filters the thumbnail catalog too.
+
+Thumbnails capture SwiftUI and native view previews in a fixed 480 × 360-point
+viewport, then scale that image into each card. Tall content is clipped rather
+than exported at its full height. Images are generated on demand and kept in a
+bounded, in-memory cache keyed by declaration and light/dark appearance; relaunch
+the host to regenerate them. Snapshot creation executes preview code, so previews
+should use safe fixture data. Async content may show its initial loading state.
+Controller and unsupported previews show an **Open to Preview** placeholder;
+browsing thumbnails never automatically presents a controller.
+
 The included [`swift-storybook-visual-check`](.agents/skills/swift-storybook-visual-check/SKILL.md) skill also turns that catalog into a repeatable visual-check workflow for coding agents.
 
 ## Quick start

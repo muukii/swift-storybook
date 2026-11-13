@@ -247,6 +247,10 @@ private struct BookCatalogView: View {
   }
 
   @ObservedObject private var store: BookStore
+  @State private var thumbnailCache = StorybookThumbnailCache()
+
+  @AppStorage("showThumbnails", store: BookCatalogView.userDefaults)
+  private var showThumbnails = true
 
   @AppStorage("autoOpenLastPage", store: BookCatalogView.userDefaults)
   private var autoOpenLastPage: Bool = true
@@ -290,44 +294,19 @@ private struct BookCatalogView: View {
 
   var body: some View {
     NavigationStack(path: $path) {
-      List {
-        if result.isEmpty == false {
-          Section {
-            ForEach(result) { node in
-              Group {
-                switch node {
-                case .folder(let folder):
-                  DisclosureGroup {
-                    ForEach(folder.contents) { childNode in
-                      SearchResultNodeView(node: childNode)
-                    }
-                  } label: {
-                    HStack {
-                      Image(systemName: "folder.fill")
-                        .foregroundStyle(.blue)
-                      Text(folder.title)
-                    }
-                  }
-                case .page(let page):
-                  page
-                }
-              }
-            }
-          } header: {
-            Text("Search Result")
+      Group {
+        if showThumbnails {
+          StorybookThumbnailGallery(
+            nodes: query.isEmpty ? store.book.contents : result,
+            cache: thumbnailCache
+          ) { page in
+            path.append(UniqueBox(value: page))
           }
+        } else {
+          catalogList
         }
-
-        Section {
-          ForEach(store.historyPages) { link in
-            link
-          }
-        } header: {
-          Text("History")
-        }
-
-        store.book
       }
+      .navigationTitle(store.title)
       .preferredColorScheme(overrideColorScheme)
       .searchable(text: $query, prompt: "Search")
       .toolbar {
@@ -337,6 +316,17 @@ private struct BookCatalogView: View {
           } label: {
             Image(systemName: "gearshape.fill")
           }
+        }
+        ToolbarItem(placement: .topBarTrailing) {
+          Button {
+            showThumbnails.toggle()
+          } label: {
+            Label(
+              showThumbnails ? "List" : "Thumbnails",
+              systemImage: showThumbnails ? "list.bullet" : "square.grid.2x2"
+            )
+          }
+          .accessibilityIdentifier("storybook.catalog.layout.toggle")
         }
         ToolbarItem(placement: .topBarTrailing) {
 
@@ -464,6 +454,24 @@ private struct BookCatalogView: View {
         }
       }
     )
+  }
+
+  private var catalogList: some View {
+    List {
+      if result.isEmpty == false {
+        Section("Search Result") {
+          ForEach(result) { node in
+            SearchResultNodeView(node: node)
+          }
+        }
+      }
+      Section("History") {
+        ForEach(store.historyPages) { page in
+          page
+        }
+      }
+      store.book
+    }
   }
 
   private func toggleAppearance() {
