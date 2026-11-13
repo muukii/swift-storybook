@@ -9,7 +9,7 @@ struct BookSidebarCatalogView: View {
   private static let userDefaults = UserDefaults(suiteName: "jp.eure.storybook2") ?? .standard
 
   @ObservedObject private var store: BookStore
-  @StateObject private var thumbnailCache = StorybookThumbnailCache()
+  @State private var thumbnailCache = StorybookThumbnailCache()
   @Environment(\.colorScheme) private var inheritedColorScheme
   @Environment(\.storybook_targetViewController) private var targetViewController
   @AppStorage("autoOpenLastPage", store: BookSidebarCatalogView.userDefaults)

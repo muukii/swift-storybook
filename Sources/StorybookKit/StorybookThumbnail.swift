@@ -14,7 +14,7 @@ enum StorybookThumbnail {
 }
 
 @MainActor
-final class StorybookThumbnailCache: ObservableObject {
+final class StorybookThumbnailCache {
 
   private final class Entry {
     let thumbnail: StorybookThumbnail

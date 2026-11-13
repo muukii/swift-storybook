@@ -247,7 +247,7 @@ private struct BookCatalogView: View {
   }
 
   @ObservedObject private var store: BookStore
-  @StateObject private var thumbnailCache = StorybookThumbnailCache()
+  @State private var thumbnailCache = StorybookThumbnailCache()
 
   @AppStorage("showThumbnails", store: BookCatalogView.userDefaults)
   private var showThumbnails = true
