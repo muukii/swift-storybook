@@ -182,7 +182,7 @@ struct BookPageDestination: View {
     #endif
     .toolbar {
       ToolbarItem(placement: appearanceToolbarPlacement) {
-        let button = Button {
+        Button {
           self.appearanceContext?.toggle()
         } label: {
           Label(
@@ -205,6 +205,7 @@ struct BookPageDestination: View {
             }
           )
         }
+        .labelStyle(.iconOnly)
         .accessibilityLabel("Appearance")
         .accessibilityValue(
           {
@@ -219,20 +220,6 @@ struct BookPageDestination: View {
           }()
         )
         .accessibilityIdentifier("storybook.page.appearance.toggle")
-
-        if appearanceContext?.overrideColorScheme != nil {
-          if #available(iOS 26, macOS 26, *) {
-            button
-              .buttonStyle(.glassProminent)
-          } else {
-            button
-              .buttonStyle(.borderedProminent)
-          }
-
-        } else {
-          button
-            .buttonStyle(.plain)
-        }
       }      
     }
     

@@ -340,7 +340,7 @@ private struct BookCatalogView: View {
         }
         ToolbarItem(placement: .topBarTrailing) {
 
-          let button = Button {
+          Button {
             toggleAppearance()
           } label: {
             Label(
@@ -364,6 +364,7 @@ private struct BookCatalogView: View {
             )
 
           }
+          .labelStyle(.iconOnly)
           .accessibilityLabel("Appearance")
           .accessibilityValue(
             {
@@ -378,20 +379,6 @@ private struct BookCatalogView: View {
             }()
           )
           .accessibilityIdentifier("storybook.appearance.toggle")
-
-          if overrideColorScheme != nil {
-            if #available(iOS 26, *) {
-              button
-                .buttonStyle(.glassProminent)
-            } else {
-              button
-                .buttonStyle(.borderedProminent)
-            }
-
-          } else {
-            button
-              .buttonStyle(.plain)
-          }
         }
       }
       .navigationDestination(for: UniqueBox<BookPage>.self) { page in
