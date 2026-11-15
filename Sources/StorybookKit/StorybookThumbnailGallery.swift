@@ -72,26 +72,12 @@ private struct StorybookThumbnailCard: View {
   @State private var thumbnail: StorybookThumbnail?
 
   var body: some View {
-    Group {
-      if dynamicTypeSize.isAccessibilitySize {
-        verticalContent
-      } else {
-        ViewThatFits(in: .horizontal) {
-          HStack(spacing: 8) {
-            thumbnailContent.frame(width: 96)
-            labels.frame(minWidth: 120, idealWidth: 120, maxWidth: .infinity)
-          }
-          verticalContent
-        }
-      }
+    VStack(alignment: .leading, spacing: 12) {
+      labels
+      thumbnailContent
     }
-    .padding(8)
     .frame(maxWidth: .infinity, alignment: .leading)
-    .background(.background)
-    .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-    .overlay {
-      RoundedRectangle(cornerRadius: 24, style: .continuous).strokeBorder(.separator)
-    }
+    .contentShape(.rect)
     .help(help)
     .task(id: colorScheme) {
       thumbnail = nil
@@ -100,13 +86,6 @@ private struct StorybookThumbnailCard: View {
       thumbnail = cache.thumbnail(for: entry.page, colorScheme: colorScheme)
     }
     .onDisappear { thumbnail = nil }
-  }
-
-  private var verticalContent: some View {
-    VStack(alignment: .leading, spacing: 8) {
-      thumbnailContent
-      labels
-    }
   }
 
   private var thumbnailContent: some View {
@@ -130,7 +109,10 @@ private struct StorybookThumbnailCard: View {
       }
     }
     .aspectRatio(4.0 / 3.0, contentMode: .fit)
-    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+    .overlay {
+      RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(.separator)
+    }
     .accessibilityHidden(true)
   }
 
