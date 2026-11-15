@@ -12,6 +12,10 @@ struct StorybookThumbnailGallery: View {
   let cache: StorybookThumbnailCache
   let onSelect: (BookPage) -> Void
 
+  #if os(iOS)
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+  #endif
   @State private var minimumCardWidth: CGFloat = 248
 
   var body: some View {
@@ -22,9 +26,7 @@ struct StorybookThumbnailGallery: View {
           .frame(maxWidth: .infinity)
           .padding(.top, 40)
       } else {
-        LazyVGrid(
-          columns: [GridItem(.adaptive(minimum: minimumCardWidth, maximum: 360))], spacing: 16
-        ) {
+        LazyVGrid(columns: columns, spacing: 16) {
           ForEach(entries) { entry in
             Button {
               onSelect(entry.page)
@@ -47,6 +49,15 @@ struct StorybookThumbnailGallery: View {
       self.minimumCardWidth = minimumCardWidth
     }
     .accessibilityIdentifier("storybook.thumbnails")
+  }
+
+  private var columns: [GridItem] {
+    #if os(iOS)
+      if horizontalSizeClass == .compact && !dynamicTypeSize.isAccessibilitySize {
+        return Array(repeating: GridItem(.flexible(minimum: 0), alignment: .top), count: 2)
+      }
+    #endif
+    return [GridItem(.adaptive(minimum: minimumCardWidth, maximum: 360), alignment: .top)]
   }
 
   static func entries(in nodes: [Book.Node], path: [String] = []) -> [Entry] {
