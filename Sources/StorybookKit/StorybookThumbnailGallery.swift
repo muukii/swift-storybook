@@ -12,6 +12,8 @@ struct StorybookThumbnailGallery: View {
   let cache: StorybookThumbnailCache
   let onSelect: (BookPage) -> Void
 
+  @State private var minimumCardWidth: CGFloat = 248
+
   var body: some View {
     let entries = Self.entries(in: nodes)
     ScrollView {
@@ -20,7 +22,9 @@ struct StorybookThumbnailGallery: View {
           .frame(maxWidth: .infinity)
           .padding(.top, 40)
       } else {
-        LazyVGrid(columns: [GridItem(.adaptive(minimum: 160, maximum: 260))], spacing: 16) {
+        LazyVGrid(
+          columns: [GridItem(.adaptive(minimum: minimumCardWidth, maximum: 360))], spacing: 16
+        ) {
           ForEach(entries) { entry in
             Button {
               onSelect(entry.page)
@@ -36,6 +40,11 @@ struct StorybookThumbnailGallery: View {
         }
         .padding(16)
       }
+    }
+    .onGeometryChange(for: CGFloat.self) { geometry in
+      min(248, max(1, geometry.size.width - 32))
+    } action: { minimumCardWidth in
+      self.minimumCardWidth = minimumCardWidth
     }
     .accessibilityIdentifier("storybook.thumbnails")
   }
@@ -58,49 +67,29 @@ private struct StorybookThumbnailCard: View {
   let cache: StorybookThumbnailCache
 
   @Environment(\.colorScheme) private var colorScheme
+  @Environment(\.dynamicTypeSize) private var dynamicTypeSize
   @State private var thumbnail: StorybookThumbnail?
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 0) {
-      ZStack {
-        Rectangle().fill(.background)
-        switch thumbnail {
-        case .image(let image):
-          #if canImport(UIKit)
-            Image(uiImage: image).resizable().scaledToFit()
-          #elseif os(macOS)
-            Image(nsImage: image).resizable().scaledToFit()
-          #endif
-        case .unavailable:
-          VStack(spacing: 8) {
-            Image(systemName: "photo")
-            Text("Open to Preview").font(.caption)
+    Group {
+      if dynamicTypeSize.isAccessibilitySize {
+        verticalContent
+      } else {
+        ViewThatFits(in: .horizontal) {
+          HStack(spacing: 8) {
+            thumbnailContent.frame(width: 96)
+            labels.frame(minWidth: 120, idealWidth: 120, maxWidth: .infinity)
           }
-          .foregroundStyle(.secondary)
-        case nil:
-          ProgressView().controlSize(.small)
+          verticalContent
         }
       }
-      .aspectRatio(4.0 / 3.0, contentMode: .fit)
-      .clipped()
-      .accessibilityHidden(true)
-
-      VStack(alignment: .leading, spacing: 4) {
-        Text(entry.page.title)
-          .font(.subheadline.weight(.medium))
-          .lineLimit(2, reservesSpace: true)
-        Text(entry.folderPath.isEmpty ? entry.page.descriptor.fileID : entry.folderPath)
-          .font(.caption)
-          .foregroundStyle(.secondary)
-          .lineLimit(1)
-      }
-      .padding(12)
-      .frame(maxWidth: .infinity, alignment: .leading)
     }
-    .background(.quaternary.opacity(0.3))
-    .clipShape(RoundedRectangle(cornerRadius: 12))
+    .padding(8)
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .background(.background)
+    .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
     .overlay {
-      RoundedRectangle(cornerRadius: 12).strokeBorder(.primary.opacity(0.1))
+      RoundedRectangle(cornerRadius: 24, style: .continuous).strokeBorder(.separator)
     }
     .help(help)
     .task(id: colorScheme) {
@@ -110,6 +99,53 @@ private struct StorybookThumbnailCard: View {
       thumbnail = cache.thumbnail(for: entry.page, colorScheme: colorScheme)
     }
     .onDisappear { thumbnail = nil }
+  }
+
+  private var verticalContent: some View {
+    VStack(alignment: .leading, spacing: 8) {
+      thumbnailContent
+      labels
+    }
+  }
+
+  private var thumbnailContent: some View {
+    ZStack {
+      Rectangle().fill(.background)
+      switch thumbnail {
+      case .image(let image):
+        #if canImport(UIKit)
+          Image(uiImage: image).resizable().scaledToFit()
+        #elseif os(macOS)
+          Image(nsImage: image).resizable().scaledToFit()
+        #endif
+      case .unavailable:
+        VStack(spacing: 8) {
+          Image(systemName: "photo")
+          Text("Open to Preview").font(.caption)
+        }
+        .foregroundStyle(.secondary)
+      case nil:
+        ProgressView().controlSize(.small)
+      }
+    }
+    .aspectRatio(4.0 / 3.0, contentMode: .fit)
+    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+    .accessibilityHidden(true)
+  }
+
+  private var labels: some View {
+    VStack(alignment: .leading, spacing: 4) {
+      Text(entry.page.title)
+        .font(.subheadline.weight(.semibold))
+        .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
+        .fixedSize(horizontal: false, vertical: true)
+      Text(entry.folderPath.isEmpty ? entry.page.descriptor.fileID : entry.folderPath)
+        .font(.caption)
+        .foregroundStyle(.secondary)
+        .lineLimit(1)
+        .truncationMode(.middle)
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
   }
 
   private var help: String {
