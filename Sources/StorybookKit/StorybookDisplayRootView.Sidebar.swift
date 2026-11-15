@@ -10,7 +10,6 @@ struct BookSidebarCatalogView: View {
 
   @ObservedObject private var store: BookStore
   @State private var thumbnailCache = StorybookThumbnailCache()
-  @Environment(\.colorScheme) private var inheritedColorScheme
   @Environment(\.storybook_targetViewController) private var targetViewController
   @AppStorage("autoOpenLastPage", store: BookSidebarCatalogView.userDefaults)
   private var autoOpenLastPage = true
@@ -24,8 +23,7 @@ struct BookSidebarCatalogView: View {
   @State private var results: [Book.Node] = []
   @State private var showSettings = false
   @State private var didRestoreSelection = false
-  @State private var appearanceContextStorage = AppearanceContext.Storage()
-  @State private var overrideColorScheme: ColorScheme?
+  @State private var appearanceContext = AppearanceContext()
 
   init(store: BookStore, initialPage: BookPage?, shouldAutoOpenLastPage: Bool) {
     self.store = store
@@ -66,20 +64,10 @@ struct BookSidebarCatalogView: View {
       .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
     .navigationSplitViewStyle(.balanced)
-    .preferredColorScheme(overrideColorScheme)
+    .preferredColorScheme(appearanceContext.overrideColorScheme)
     .environment(\.bookContext, store)
-    .environment(
-      \.appearanceContext,
-      .init(overrideColorScheme: overrideColorScheme, storage: appearanceContextStorage)
-    )
-    .onChange(of: appearanceContextStorage.count) { _, _ in
-      if overrideColorScheme != nil {
-        overrideColorScheme = nil
-      } else {
-        overrideColorScheme = inheritedColorScheme == .dark ? .light : .dark
-      }
-    }
-    .onChange(of: overrideColorScheme, initial: true) { _, value in
+    .environment(\.appearanceContext, appearanceContext)
+    .onChange(of: appearanceContext.overrideColorScheme, initial: true) { _, value in
       // Native fixtures must receive the same override as SwiftUI content.
       let appearance = value.flatMap { NSAppearance(named: $0 == .dark ? .darkAqua : .aqua) }
       targetViewController?.children.forEach { $0.view.appearance = appearance }
@@ -125,30 +113,12 @@ struct BookSidebarCatalogView: View {
             }
           }
         }
-        Section {
+        Section("Previews") {
           ForEach(store.book.contents) { node in
             NodeRow(
               node: node, path: ["catalog"], ancestors: [],
               expandedFolders: $expandedFolders
             )
-          }
-        } header: {
-          HStack {
-            Text("Previews")
-            Spacer()
-            Button {
-              let folders = Self.folderIDs(in: store.book.contents)
-              if folders.isSubset(of: expandedFolders) {
-                expandedFolders.subtract(folders)
-              } else {
-                expandedFolders.formUnion(folders)
-              }
-            } label: {
-              Image(systemName: "arrow.up.arrow.down")
-            }
-            .buttonStyle(.borderless)
-            .help("Expand or Collapse All Folders")
-            .accessibilityLabel("Expand or Collapse All Folders")
           }
         }
       } else {
