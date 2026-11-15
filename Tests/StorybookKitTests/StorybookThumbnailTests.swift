@@ -199,6 +199,27 @@ struct StorybookThumbnailTests {
     #expect(StorybookThumbnailGallery.entries(in: []).isEmpty)
   }
 
+  @Test("Overlapping folder and page search results produce one card per declaration")
+  func overlappingSearchResults() async {
+    let first = BookPage(title: "Counter") { Color.red }
+    let second = BookPage(title: "Counter") { Color.blue }
+    let folder = Book(title: "Counter") {
+      first
+      second
+    }
+    let store = BookStore(book: Book(title: "Catalog") { folder })
+    let results = await store.search(query: "Counter")
+    #expect(results.count == 3)
+    for nodes in [results, Array(results.reversed())] {
+      let entries = StorybookThumbnailGallery.entries(in: nodes)
+      #expect(entries.count == 2)
+      #expect(Set(entries.map(\.id)) == Set([first.id, second.id]))
+    }
+    let repeated = StorybookThumbnailGallery.entries(in: [.folder(folder), .folder(folder)])
+    #expect(repeated.map(\.id) == [first.id, second.id])
+    #expect(repeated.map(\.folderPath) == ["Counter", "Counter"])
+  }
+
   #if canImport(UIKit)
     @Test("Native scrolling content uses the bounded viewport in both appearances")
     func nativeScrollView() throws {

@@ -50,14 +50,15 @@ struct StorybookThumbnailGallery: View {
   }
 
   static func entries(in nodes: [Book.Node], path: [String] = []) -> [Entry] {
-    nodes.flatMap { node -> [Entry] in
+    var seen: Set<BookPage.ID> = []
+    return nodes.flatMap { node -> [Entry] in
       switch node {
       case .page(let page):
         return [Entry(page: page, folderPath: path.joined(separator: " / "))]
       case .folder(let folder):
         return entries(in: folder.contents, path: path + [folder.title])
       }
-    }
+    }.filter { seen.insert($0.id).inserted }
   }
 }
 
