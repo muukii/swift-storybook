@@ -25,7 +25,7 @@ public struct StorybookViewport: View {
     self.init(descriptor: page.descriptor, destination: destination)
   }
 
-  fileprivate init(
+  init(
     descriptor: BookPageDescriptor,
     destination: @escaping @MainActor () -> AnyView
   ) {
