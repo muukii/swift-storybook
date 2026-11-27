@@ -373,13 +373,19 @@ private struct BookCatalogView: View {
           #endif
       }
     }
+    .environment(\.storybook_openFullScreenPage, { page in
+      fullScreenPage = page
+    })
     .fullScreenCover(item: $fullScreenPage) { page in
       _ViewControllerHost {
-        _ViewController(
+        _FullScreenPageViewController(
           content:
             BookPageDestination(page: page, presentation: .fullScreen)
               .environment(\.bookContext, store)
-              .environment(\.appearanceContext, appearanceContext)
+              .environment(\.appearanceContext, appearanceContext),
+          onReturnToCatalog: {
+            fullScreenPage = nil
+          }
         )
       }
     }
@@ -502,7 +508,7 @@ private struct SearchResultNodeView: View {
 }
 
 #if canImport(UIKit)
-final class _ViewController<Content: View>: UIViewController {
+class _ViewController<Content: View>: UIViewController {
 
   private let content: Content
 
@@ -539,6 +545,221 @@ final class _ViewController<Content: View>: UIViewController {
 
   }
 
+}
+
+private struct FullScreenOperationsSheet: View {
+
+  let onReturnToCatalog: () -> Void
+  let onCancel: () -> Void
+
+  var body: some View {
+    VStack(spacing: 16) {
+      Text("Storybook Actions")
+        .font(.headline)
+
+      Button("Return to Catalog", role: .destructive, action: onReturnToCatalog)
+        .accessibilityIdentifier("storybook.fullscreen.returnToCatalog")
+
+      Button("Cancel", role: .cancel, action: onCancel)
+        .accessibilityIdentifier("storybook.fullscreen.cancel")
+    }
+    .frame(maxWidth: .infinity, maxHeight: .infinity)
+    .padding()
+  }
+}
+
+private final class _FullScreenPageViewController<Content: View>: _ViewController<Content>,
+  UIAdaptivePresentationControllerDelegate
+{
+
+  private let onReturnToCatalog: @MainActor () -> Void
+  private var operationsSheet: UIHostingController<FullScreenOperationsSheet>?
+  private var editingTextInputs = Set<ObjectIdentifier>()
+  private var hasReturnedToCatalog = false
+
+  override var canBecomeFirstResponder: Bool {
+    true
+  }
+
+  init(content: Content, onReturnToCatalog: @escaping @MainActor () -> Void) {
+    self.onReturnToCatalog = onReturnToCatalog
+    super.init(content: content)
+  }
+
+  required init?(coder: NSCoder) {
+    fatalError("init(coder:) has not been implemented")
+  }
+
+  override func viewDidLoad() {
+    super.viewDidLoad()
+
+    NotificationCenter.default.addObserver(
+      self,
+      selector: #selector(textInputDidBeginEditing(_:)),
+      name: UITextField.textDidBeginEditingNotification,
+      object: nil
+    )
+    NotificationCenter.default.addObserver(
+      self,
+      selector: #selector(textInputDidEndEditing(_:)),
+      name: UITextField.textDidEndEditingNotification,
+      object: nil
+    )
+    NotificationCenter.default.addObserver(
+      self,
+      selector: #selector(textInputDidBeginEditing(_:)),
+      name: UITextView.textDidBeginEditingNotification,
+      object: nil
+    )
+    NotificationCenter.default.addObserver(
+      self,
+      selector: #selector(textInputDidEndEditing(_:)),
+      name: UITextView.textDidEndEditingNotification,
+      object: nil
+    )
+  }
+
+  override func viewDidAppear(_ animated: Bool) {
+    super.viewDidAppear(animated)
+    restoreFirstResponderIfAvailable()
+  }
+
+  override func motionEnded(_ motion: UIEvent.EventSubtype, with event: UIEvent?) {
+    guard motion == .motionShake,
+      isFirstResponder,
+      view.window?.isKeyWindow == true,
+      hasReturnedToCatalog == false
+    else {
+      super.motionEnded(motion, with: event)
+      return
+    }
+
+    presentOperationsSheetIfNeeded()
+  }
+
+  func presentationControllerDidDismiss(_ presentationController: UIPresentationController) {
+    guard presentationController.presentedViewController === operationsSheet else {
+      return
+    }
+
+    operationsSheet = nil
+    restoreFirstResponderIfAvailable()
+  }
+
+  @objc private func textInputDidBeginEditing(_ notification: Notification) {
+    guard let textInput = notification.object as? UIView,
+      let window = view.window,
+      textInput.window === window
+    else {
+      return
+    }
+
+    editingTextInputs.insert(ObjectIdentifier(textInput))
+  }
+
+  @objc private func textInputDidEndEditing(_ notification: Notification) {
+    guard let textInput = notification.object as? UIView else { return }
+
+    guard editingTextInputs.remove(ObjectIdentifier(textInput)) != nil else { return }
+    Task { @MainActor [weak self] in
+      self?.restoreFirstResponderIfAvailable()
+    }
+  }
+
+  private func restoreFirstResponderIfAvailable() {
+    guard hasReturnedToCatalog == false,
+      editingTextInputs.isEmpty,
+      operationsSheet == nil,
+      view.window?.isKeyWindow == true,
+      isFirstResponder == false
+    else {
+      return
+    }
+
+    becomeFirstResponder()
+  }
+
+  private func presentOperationsSheetIfNeeded() {
+    guard operationsSheet == nil,
+      let window = view.window,
+      window.isKeyWindow
+    else {
+      return
+    }
+
+    let presenter = topmostViewController(from: self, in: window)
+    guard !(presenter is UIAlertController),
+      presenter.viewIfLoaded?.window === window,
+      presenter.presentedViewController == nil,
+      presenter.isBeingDismissed == false,
+      presenter.isBeingPresented == false
+    else {
+      return
+    }
+
+    let sheet = UIHostingController(
+      rootView: FullScreenOperationsSheet(
+        onReturnToCatalog: { [weak self] in
+          guard let self else { return }
+          self.hasReturnedToCatalog = true
+          self.onReturnToCatalog()
+        },
+        onCancel: { [weak self] in
+          self?.dismissOperationsSheet()
+        }
+      )
+    )
+    sheet.modalPresentationStyle = .pageSheet
+    if let sheetPresentationController = sheet.sheetPresentationController {
+      sheetPresentationController.detents = [.medium()]
+      sheetPresentationController.prefersGrabberVisible = true
+    }
+
+    operationsSheet = sheet
+    presenter.present(sheet, animated: true) { [weak self, weak sheet] in
+      guard let self,
+        let sheet,
+        operationsSheet === sheet
+      else {
+        return
+      }
+
+      sheet.presentationController?.delegate = self
+    }
+  }
+
+  private func dismissOperationsSheet() {
+    guard let operationsSheet else { return }
+
+    operationsSheet.dismiss(animated: true) { [weak self, weak operationsSheet] in
+      guard let self,
+        let operationsSheet,
+        self.operationsSheet === operationsSheet
+      else {
+        return
+      }
+
+      self.operationsSheet = nil
+      self.restoreFirstResponderIfAvailable()
+    }
+  }
+
+  private func topmostViewController(from controller: UIViewController, in window: UIWindow)
+    -> UIViewController
+  {
+    if let presented = controller.presentedViewController,
+      presented.isBeingDismissed == false
+    {
+      return topmostViewController(from: presented, in: window)
+    }
+
+    for child in controller.children.reversed() {
+      guard child.viewIfLoaded?.window === window else { continue }
+      return topmostViewController(from: child, in: window)
+    }
+
+    return controller
+  }
 }
 
 @available(iOS 26, *)

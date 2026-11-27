@@ -257,7 +257,7 @@ The standard arguments are:
 
 Add `--storybook-fullscreen` after a page name to open that page without Storybook's navigation presentation. On UIKit, this uses a full-screen cover and displays the preview without Storybook's `NavigationStack`, title, appearance toolbar, or outer scrolling container; a preview-owned `NavigationStack` then supplies its own navigation and toolbar. Existing page requests continue to use push navigation. On macOS, the request selects the page in the existing sidebar detail view.
 
-Storybook does not yet provide a return-to-catalog control, gesture, or runtime command for this fullscreen mode.
+On iOS and iPadOS, shake the device while the fullscreen page is active to open its actions sheet. Choose **Return to Catalog** to close the preview and any presentation it opened; **Cancel** or swiping the sheet away keeps the same preview open. From the catalog, long-press a page row and choose **Open Fullscreen** to reopen a preview without relaunching; the catalog, search, and navigation state remain underneath the cover. The fullscreen host uses UIKit's active-window responder chain and does not require a custom `UIWindow`. While a text field or text view is editing, it keeps first-responder ownership; shake may be consumed by text editing (for example, Undo), so Storybook does not guarantee opening the actions sheet in that state. No runtime command or keyboard shortcut is provided. macOS continues to use the sidebar detail view.
 
 The iOS demo includes `#Preview("Navigation Stack Fullscreen")` in `Development/SwiftUIDemoApp/Component.swift` for checking a preview-owned stack and toolbar. Launch it with these distinct arguments:
 
@@ -272,6 +272,8 @@ SwiftUIDemoApp/Component.swift
 ```
 
 The expected page identifier is `storybook.page|27:Navigation Stack Fullscreen|30:SwiftUIDemoApp/Component.swift|58`.
+
+The `#Preview("Fullscreen Shake Interaction")` fixture at `SwiftUIDemoApp/Component.swift:80` has a focused text input and a Preview-owned sheet for exercising shake ownership and return behavior. Its expected page marker is `storybook.page|28:Fullscreen Shake Interaction|30:SwiftUIDemoApp/Component.swift|80`.
 
 After a page opens, its root exposes a deterministic accessibility identifier in this form:
 

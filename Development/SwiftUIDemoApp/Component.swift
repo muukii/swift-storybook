@@ -77,6 +77,52 @@ import UIKit
   }
 }
 
+#Preview("Fullscreen Shake Interaction") {
+  FullscreenShakeInteractionPreview()
+}
+
+private struct FullscreenShakeInteractionPreview: View {
+
+  @State private var text = ""
+  @State private var sheetText = ""
+  @State private var isShowingSheet = false
+
+  var body: some View {
+    NavigationStack {
+      Form {
+        TextField("Preview text", text: $text)
+          .accessibilityIdentifier("storybook.shake.input")
+
+        Text("Entered: \(text)")
+          .accessibilityIdentifier("storybook.shake.enteredText")
+
+        Button("Open Preview Sheet") {
+          isShowingSheet = true
+        }
+        .accessibilityIdentifier("storybook.shake.openSheet")
+      }
+      .navigationTitle("Shake Preview")
+      .toolbar {
+        Button("Preview action") {}
+      }
+      .sheet(isPresented: $isShowingSheet) {
+        NavigationStack {
+          Form {
+            TextField("Sheet text", text: $sheetText)
+              .accessibilityIdentifier("storybook.shake.sheetInput")
+
+            Button("Close Preview Sheet") {
+              isShowingSheet = false
+            }
+            .accessibilityIdentifier("storybook.shake.closeSheet")
+          }
+          .navigationTitle("Preview Sheet")
+        }
+      }
+    }
+  }
+}
+
 @MainActor
 private func longScrollingView() -> UIView {
   let root = UIView()

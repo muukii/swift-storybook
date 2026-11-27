@@ -54,6 +54,10 @@ private func issueUniqueNumber() -> Int {
 /// A component that displays a disclosure view.
 public struct BookPage: BookView, Identifiable, Sendable {
 
+  #if canImport(UIKit)
+  @Environment(\.storybook_openFullScreenPage) private var openFullScreenPage
+  #endif
+
   public nonisolated var id: DeclarationIdentifier {
     declarationIdentifier
   }
@@ -109,7 +113,26 @@ public struct BookPage: BookView, Identifiable, Sendable {
   }
 
   public var body: some View {
+    #if canImport(UIKit)
+    if let openFullScreenPage {
+      pageLink
+        .contextMenu {
+          Button {
+            openFullScreenPage(self)
+          } label: {
+            Label("Open Fullscreen", systemImage: "arrow.up.left.and.arrow.down.right")
+          }
+          .accessibilityIdentifier("storybook.page.openFullscreen")
+        }
+    } else {
+      pageLink
+    }
+    #else
+    pageLink
+    #endif
+  }
 
+  private var pageLink: some View {
     NavigationLink {
       BookPageDestination(page: self)
     } label: {
@@ -118,13 +141,7 @@ public struct BookPage: BookView, Identifiable, Sendable {
         fileID: descriptor.fileID,
         line: descriptor.line
       )
-      //        .contextMenu(menuItems: {
-      //          Text(title)
-      //        }) {
-      //          destination
-      //        }
     }
-
   }
 }
 

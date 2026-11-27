@@ -64,6 +64,16 @@ presentation. For those behaviors, launch the qualified page with
 exercise the relevant interaction. Use viewport exports only for isolated
 content and layout checks.
 
+For fullscreen return-flow checks, open a catalog row's context menu and select
+**Open Fullscreen** so the test can verify that search and list navigation state
+survive returning. In a live Simulator, exercise shake with no text input
+focused, Cancel, swipe dismissal, repeated shakes while the actions sheet is
+open, and Return to Catalog while a Preview-owned presentation is open. Also
+test a focused text field/text view: do not take its first-responder status;
+shake may be consumed for text editing, and the entered text and focus must not
+be disturbed. After editing ends, verify the fullscreen actions are available
+again. Viewport exports cannot cover these interactions.
+
 ## Capture evidence
 
 For isolated content and layout checks, prefer a viewport artifact when the host

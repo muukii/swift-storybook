@@ -5,8 +5,17 @@ extension EnvironmentValues {
 }
 
 #if canImport(UIKit)
+private struct StorybookOpenFullScreenPageKey: EnvironmentKey {
+  static let defaultValue: (@MainActor (BookPage) -> Void)? = nil
+}
+
 extension EnvironmentValues {
   @Entry public var storybook_targetViewController: UIViewController?
+
+  var storybook_openFullScreenPage: (@MainActor (BookPage) -> Void)? {
+    get { self[StorybookOpenFullScreenPageKey.self] }
+    set { self[StorybookOpenFullScreenPageKey.self] = newValue }
+  }
 }
 #elseif os(macOS)
 import AppKit
