@@ -113,7 +113,7 @@ public struct BookPage: BookView, Identifiable, Sendable {
   }
 
   public var body: some View {
-    #if canImport(UIKit)
+    #if canImport(UIKit) && !targetEnvironment(macCatalyst)
     if let openFullScreenPage {
       pageLink
         .contextMenu {

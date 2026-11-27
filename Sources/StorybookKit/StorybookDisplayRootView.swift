@@ -229,6 +229,12 @@ private struct BookContainer: View {
         initialPage: page,
         shouldAutoOpenLastPage: false
       )
+      #elseif targetEnvironment(macCatalyst)
+      BookCatalogView(
+        store: store,
+        initialPage: page,
+        shouldAutoOpenLastPage: false
+      )
       #else
       BookCatalogView(
         store: store,

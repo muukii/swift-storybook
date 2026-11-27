@@ -29,7 +29,7 @@ Use these arguments:
 
 - Use `--storybook` alone only when the catalog is the requested result.
 - Pass the page name as the positional value immediately after `--storybook`.
-- Add `--storybook-fullscreen` after the page name to verify a UIKit preview without Storybook's navigation presentation.
+- Add `--storybook-fullscreen` after the page name to verify an iOS/iPadOS preview without Storybook's navigation presentation. On Mac Catalyst, the argument falls back to ordinary push navigation; the shake actions and **Open Fullscreen** catalog action are not available.
 - For an empty or hyphen-led name, pass one exact argument in the form
   `--storybook-name=<name>` after `--storybook`.
 - Treat `<fileID>` as the compiler source identifier, commonly `Module/Path/File.swift`.
