@@ -1,5 +1,13 @@
 import SwiftUI
 
+final class StorybookControllerReference<Controller: AnyObject> {
+  weak var controller: Controller?
+
+  init(_ controller: Controller) {
+    self.controller = controller
+  }
+}
+
 extension EnvironmentValues {
   @Entry var storybook_isFullScreenPresentation = false
 }
@@ -10,7 +18,12 @@ private struct StorybookOpenFullScreenPageKey: EnvironmentKey {
 }
 
 extension EnvironmentValues {
-  @Entry public var storybook_targetViewController: UIViewController?
+  @Entry private var storybook_controllerReference: StorybookControllerReference<UIViewController>?
+
+  public var storybook_targetViewController: UIViewController? {
+    get { storybook_controllerReference?.controller }
+    set { storybook_controllerReference = newValue.map(StorybookControllerReference.init) }
+  }
 
   var storybook_openFullScreenPage: (@MainActor (BookPage) -> Void)? {
     get { self[StorybookOpenFullScreenPageKey.self] }
@@ -21,7 +34,7 @@ extension EnvironmentValues {
 import AppKit
 
 extension EnvironmentValues {
-  @Entry private var storybook_controllerReference: StorybookControllerReference?
+  @Entry private var storybook_controllerReference: StorybookControllerReference<NSViewController>?
 
   /// The nearest Storybook controller used for native AppKit presentations.
   ///
@@ -30,15 +43,6 @@ extension EnvironmentValues {
   public var storybook_targetViewController: NSViewController? {
     get { storybook_controllerReference?.controller }
     set { storybook_controllerReference = newValue.map(StorybookControllerReference.init) }
-  }
-}
-
-/// Makes the presentation target available without retaining its native owner.
-private final class StorybookControllerReference {
-  weak var controller: NSViewController?
-
-  init(_ controller: NSViewController) {
-    self.controller = controller
   }
 }
 #endif
