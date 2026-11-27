@@ -35,6 +35,7 @@ struct FullscreenControlOverlayTests {
 
     #expect(window.canBecomeKey == false)
     #expect(window.hitTest(CGPoint(x: 20, y: 20), with: nil) == nil)
+    #expect(window.hitTest(CGPoint(x: 121, y: 221), with: nil) == nil)
     #expect(window.hitTest(CGPoint(x: 148, y: 248), with: nil) === button)
   }
 

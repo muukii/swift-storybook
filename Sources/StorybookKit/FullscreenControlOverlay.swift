@@ -329,7 +329,16 @@ final class FullscreenControlPassthroughView: UIView {
     guard let controlView else { return nil }
 
     let visibleFrame = controlView.layer.presentation()?.frame ?? controlView.frame
-    guard visibleFrame.contains(point) else { return nil }
+    guard visibleFrame.contains(point),
+      visibleFrame.width > 0,
+      visibleFrame.height > 0
+    else {
+      return nil
+    }
+
+    let normalizedX = (point.x - visibleFrame.midX) / (visibleFrame.width / 2)
+    let normalizedY = (point.y - visibleFrame.midY) / (visibleFrame.height / 2)
+    guard normalizedX * normalizedX + normalizedY * normalizedY <= 1 else { return nil }
 
     let controlPoint = CGPoint(
       x: point.x - visibleFrame.minX,
