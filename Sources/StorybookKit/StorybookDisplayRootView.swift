@@ -374,8 +374,14 @@ private struct BookCatalogView: View {
       }
     }
     .fullScreenCover(item: $fullScreenPage) { page in
-      BookPageDestination(page: page, presentation: .fullScreen)
-        .environment(\.bookContext, store)
+      _ViewControllerHost {
+        _ViewController(
+          content:
+            BookPageDestination(page: page, presentation: .fullScreen)
+              .environment(\.bookContext, store)
+              .environment(\.appearanceContext, appearanceContext)
+        )
+      }
     }
     .environment(\.bookContext, store)
     .environment(\.appearanceContext, appearanceContext)
