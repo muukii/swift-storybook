@@ -242,16 +242,12 @@ struct PreviewRegistryWrapper: Comparable {
     case "SwiftUI.ViewPreviewSource": // iOS 17 / macOS 14
       let makeView: MakeFunctionWrapper<any SwiftUI.View> = .init(source["makeView"])
       return {
-        VStack {
-          if let title, !title.isEmpty {
-            Text(title)
-              .font(.system(size: 17, weight: .semibold))
-          }
-          AnyView(makeView())
-          Text("\(fileID):\(line)")
-            .font(.caption.monospacedDigit())
-          BookSpacer(height: 16)
-        }
+        LegacySwiftUIPreviewMetadata(
+          title: title,
+          fileID: fileID,
+          line: line,
+          content: AnyView(makeView())
+        )
       }
 
     #if canImport(UIKit)
@@ -670,6 +666,35 @@ struct PreviewRegistryWrapper: Comparable {
               Image(systemName: "info.circle")
             }
           }
+        }
+      }
+    }
+  }
+
+  private struct LegacySwiftUIPreviewMetadata: View {
+
+    @Environment(\.storybook_isFullScreenPresentation)
+    private var isFullScreenPresentation
+
+    let title: String?
+    let fileID: String
+    let line: Int
+    let content: AnyView
+
+    @ViewBuilder
+    var body: some View {
+      if isFullScreenPresentation {
+        content
+      } else {
+        VStack {
+          if let title, !title.isEmpty {
+            Text(title)
+              .font(.system(size: 17, weight: .semibold))
+          }
+          content
+          Text("\(fileID):\(line)")
+            .font(.caption.monospacedDigit())
+          BookSpacer(height: 16)
         }
       }
     }
