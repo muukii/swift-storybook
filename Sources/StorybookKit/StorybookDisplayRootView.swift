@@ -288,8 +288,7 @@ private struct BookCatalogView: View {
   @State private var currentTask: Task<Void, Error>?
   @State private var showSettings: Bool = false
   @State private var fullScreenPage: BookPage?
-  @State private var supportsFullscreenReturn = false
-  @State private var fullScreenWindowSession = StorybookWindowSession()
+  @State private var fullScreenControlSession = FullscreenControlSession()
   @State private var path: NavigationPath
 
   @Environment(\.storybook_targetViewController) private var targetViewController
@@ -297,11 +296,14 @@ private struct BookCatalogView: View {
   @State private var appearanceContext = AppearanceContext()
 
   private var openFullScreenPageAction: (@MainActor (BookPage) -> Void)? {
-    guard supportsFullscreenReturn else { return nil }
+#if targetEnvironment(macCatalyst)
+    nil
+#else
     return { page in
       targetViewController?.view.window?.endEditing(true)
       fullScreenPage = page
     }
+#endif
   }
 
   @MainActor
@@ -392,7 +394,7 @@ private struct BookCatalogView: View {
     .environment(\.storybook_openFullScreenPage, openFullScreenPageAction)
     .fullScreenCover(
       item: $fullScreenPage,
-      onDismiss: { fullScreenWindowSession.deactivate() }
+      onDismiss: { fullScreenControlSession.deactivate() }
     ) { page in
       _ViewControllerHost {
         _FullScreenPageViewController(
@@ -400,12 +402,13 @@ private struct BookCatalogView: View {
             BookPageDestination(page: page, presentation: .fullScreen)
               .environment(\.bookContext, store)
               .environment(\.appearanceContext, appearanceContext),
-          windowSession: fullScreenWindowSession,
+          controlSession: fullScreenControlSession,
           onReturnToCatalog: {
             fullScreenPage = nil
           }
         )
       }
+      .ignoresSafeArea()
     }
     .environment(\.bookContext, store)
     .environment(\.appearanceContext, appearanceContext)
@@ -419,10 +422,6 @@ private struct BookCatalogView: View {
       targetViewController?.children.forEach { $0.overrideUserInterfaceStyle = style }
     }
     .onAppear {
-      #if canImport(UIKit) && !targetEnvironment(macCatalyst)
-      supportsFullscreenReturn = targetViewController?.view.window is StorybookWindow
-      #endif
-
       guard shouldAutoOpenLastPage, autoOpenLastPage else {
         return
       }
@@ -567,44 +566,19 @@ class _ViewController<Content: View>: UIViewController {
 
 }
 
-private struct FullScreenOperationsSheet: View {
-
-  let onReturnToCatalog: () -> Void
-  let onCancel: () -> Void
-
-  var body: some View {
-    VStack(spacing: 16) {
-      Text("Storybook Actions")
-        .font(.headline)
-
-      Button("Return to Catalog", role: .destructive, action: onReturnToCatalog)
-        .accessibilityIdentifier("storybook.fullscreen.returnToCatalog")
-
-      Button("Cancel", role: .cancel, action: onCancel)
-        .accessibilityIdentifier("storybook.fullscreen.cancel")
-    }
-    .frame(maxWidth: .infinity, maxHeight: .infinity)
-    .padding()
-  }
-}
-
-private final class _FullScreenPageViewController<Content: View>: _ViewController<Content>,
-  UIAdaptivePresentationControllerDelegate,
-  StorybookWindowMotionHandler
-{
+private final class _FullScreenPageViewController<Content: View>: _ViewController<Content> {
 
   private let onReturnToCatalog: @MainActor () -> Void
-  private let windowSession: StorybookWindowSession
-  private var operationsSheet: UIHostingController<FullScreenOperationsSheet>?
+  private let controlSession: FullscreenControlSession
   private var hasReturnedToCatalog = false
 
   init(
     content: Content,
-    windowSession: StorybookWindowSession,
+    controlSession: FullscreenControlSession,
     onReturnToCatalog: @escaping @MainActor () -> Void
   ) {
     self.onReturnToCatalog = onReturnToCatalog
-    self.windowSession = windowSession
+    self.controlSession = controlSession
     super.init(content: content)
   }
 
@@ -614,30 +588,15 @@ private final class _FullScreenPageViewController<Content: View>: _ViewControlle
 
   override func viewDidAppear(_ animated: Bool) {
     super.viewDidAppear(animated)
-    windowSession.activate(window: view.window, handler: self)
-  }
-
-  func storybookWindowDidReceiveShake() {
-    guard hasReturnedToCatalog == false else { return }
-    presentOperationsSheetIfNeeded()
-  }
-
-  func presentationControllerDidDismiss(_ presentationController: UIPresentationController) {
-    guard presentationController.presentedViewController === operationsSheet else {
-      return
+    controlSession.activate(window: view.window) { [weak self] sourceView in
+      self?.presentReturnMenu(from: sourceView)
     }
-
-    operationsSheet = nil
-    windowSession.restoreFirstResponderIfAvailable()
   }
 
-  private func presentOperationsSheetIfNeeded() {
-    guard operationsSheet == nil,
-      let window = view.window,
-      window.isKeyWindow
-    else {
-      return
-    }
+  private func presentReturnMenu(from sourceView: UIView) {
+    guard hasReturnedToCatalog == false,
+      let window = view.window
+    else { return }
 
     let presenter = topmostViewController(from: self, in: window)
     guard !(presenter is UIAlertController),
@@ -649,52 +608,28 @@ private final class _FullScreenPageViewController<Content: View>: _ViewControlle
       return
     }
 
-    let sheet = UIHostingController(
-      rootView: FullScreenOperationsSheet(
-        onReturnToCatalog: { [weak self] in
-          guard let self else { return }
-          self.hasReturnedToCatalog = true
-          self.windowSession.deactivate(self)
-          self.onReturnToCatalog()
-        },
-        onCancel: { [weak self] in
-          self?.dismissOperationsSheet()
-        }
-      )
+    let menu = UIAlertController(title: nil, message: nil, preferredStyle: .actionSheet)
+    menu.addAction(
+      UIAlertAction(title: "Return to Catalog", style: .destructive) { [weak self] _ in
+        guard let self else { return }
+        self.hasReturnedToCatalog = true
+        self.controlSession.deactivate()
+        self.onReturnToCatalog()
+      }
     )
-    sheet.modalPresentationStyle = .pageSheet
-    if let sheetPresentationController = sheet.sheetPresentationController {
-      sheetPresentationController.detents = [.medium()]
-      sheetPresentationController.prefersGrabberVisible = true
+    menu.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+
+    if let popover = menu.popoverPresentationController,
+      let overlayWindow = sourceView.window,
+      let presenterWindow = presenter.viewIfLoaded?.window
+    {
+      let rectInOverlayWindow = sourceView.convert(sourceView.bounds, to: nil)
+      let rectInPresenterWindow = overlayWindow.convert(rectInOverlayWindow, to: presenterWindow)
+      popover.sourceView = presenter.view
+      popover.sourceRect = presenter.view.convert(rectInPresenterWindow, from: presenterWindow)
     }
 
-    operationsSheet = sheet
-    presenter.present(sheet, animated: true) { [weak self, weak sheet] in
-      guard let self,
-        let sheet,
-        operationsSheet === sheet
-      else {
-        return
-      }
-
-      sheet.presentationController?.delegate = self
-    }
-  }
-
-  private func dismissOperationsSheet() {
-    guard let operationsSheet else { return }
-
-    operationsSheet.dismiss(animated: true) { [weak self, weak operationsSheet] in
-      guard let self,
-        let operationsSheet,
-        self.operationsSheet === operationsSheet
-      else {
-        return
-      }
-
-      self.operationsSheet = nil
-      self.windowSession.restoreFirstResponderIfAvailable()
-    }
+    presenter.present(menu, animated: true)
   }
 
   private func topmostViewController(from controller: UIViewController, in window: UIWindow)

@@ -29,7 +29,7 @@ Use these arguments:
 
 - Use `--storybook` alone only when the catalog is the requested result.
 - Pass the page name as the positional value immediately after `--storybook`.
-- Add `--storybook-fullscreen` after the page name to verify an iOS/iPadOS preview without Storybook's navigation presentation. On Mac Catalyst, the argument falls back to ordinary push navigation; the shake actions and **Open Fullscreen** catalog action are not available.
+- Add `--storybook-fullscreen` after the page name to verify an iOS/iPadOS preview without Storybook's navigation presentation. On Mac Catalyst, the argument falls back to ordinary push navigation; the floating control and **Open Fullscreen** catalog action are not available.
 - For an empty or hyphen-led name, pass one exact argument in the form
   `--storybook-name=<name>` after `--storybook`.
 - Treat `<fileID>` as the compiler source identifier, commonly `Module/Path/File.swift`.
@@ -64,27 +64,31 @@ presentation. For those behaviors, launch the qualified page with
 exercise the relevant interaction. Use viewport exports only for isolated
 content and layout checks.
 
-For fullscreen return-flow checks, use an iOS/iPadOS host whose scene creates a
-`StorybookWindow`; a default SwiftUI `WindowGroup` does not enable shake
-routing and hides **Open Fullscreen**. Open a catalog row's context menu and
-select **Open Fullscreen** so the test can verify that search and list
-navigation state survive returning. Search for `e`, scroll the results, then
-open **Open Fullscreen** from a row while the catalog search field is active.
-Verify the search text and scroll position remain, catalog editing ends, and
-shake opens the actions sheet; preview-owned input autofocus must still work.
-In a live Simulator, exercise shake with no text input focused, Cancel, swipe
-dismissal, repeated shakes while the actions sheet is open, and Return to
-Catalog while a Preview-owned presentation is open. Also test a focused text
-field/text view: do not take its first-responder status; shake may be consumed
-for text editing, and the entered text and focus must not be disturbed. After
-editing ends, verify the fullscreen actions are available again. The window
-handles completed shakes through `UIResponder.motionEnded(_:with:)`; if another
-responder owns and consumes the event, the action sheet is not guaranteed.
+For fullscreen return-flow checks on iOS/iPadOS, use the floating control
+identified by `storybook.fullscreen.menu`. No custom host window or UIKit
+scene-delegate setup is required. Open a catalog row's context menu and select
+**Open Fullscreen** so the test can verify that search and list navigation state
+survive returning. Search for `e`, scroll the results, then open **Open
+Fullscreen** while the catalog search field is active. Verify the query and
+scroll position remain, catalog editing ends, and Preview-owned input can still
+autofocus. Drag the control from its lower-trailing starting position, release
+with velocity toward each horizontal edge, and catch it while its spring is in
+flight. Touch and scroll outside the control to verify pass-through behavior.
+
+Tap the control and verify the native action sheet. If UIKit shows **Cancel**,
+choose it; otherwise dismiss outside. Either dismissal must preserve the same
+Preview and its state. Choose **Return to Catalog** while a Preview-owned
+presentation is open and verify the catalog returns. Also focus a Preview text
+field and test native editing/Undo; the floating control must not take
+first-responder status or interrupt input.
 Viewport exports cannot cover these interactions.
 
-After switching the demo from SwiftUI's `App` lifecycle to a UIKit scene
-delegate, reinstall it once before testing; the sample does not migrate saved
-scene sessions.
+For safe-area checks, launch `Fullscreen Safe Area Plain` and verify its indigo
+background reaches the display edges while both labels remain inside the safe
+area. Then launch `Fullscreen Safe Area Navigation Stack`, check the teal root,
+push detail, and verify the pink detail background, safe-area labels, back
+navigation, and toolbars. These fixtures are appended after the existing
+line-58 and line-80 selectors.
 
 ## Capture evidence
 

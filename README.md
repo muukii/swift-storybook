@@ -257,20 +257,9 @@ The standard arguments are:
 
 Add `--storybook-fullscreen` after a page name to open that page without Storybook's navigation presentation. On iOS and iPadOS, this uses a full-screen cover and displays the preview without Storybook's `NavigationStack`, title, appearance toolbar, or outer scrolling container; a preview-owned `NavigationStack` then supplies its own navigation and toolbar. Existing page requests continue to use push navigation. On Mac Catalyst, this argument intentionally falls back to the existing push navigation. On macOS, the request selects the page in the existing sidebar detail view.
 
-On iOS and iPadOS, shake the device while the fullscreen page is active to open its actions sheet. Choose **Return to Catalog** to close the preview and any presentation it opened; **Cancel** or swiping the sheet away keeps the same preview open. From a `StorybookWindow` catalog, long-press a page row and choose **Open Fullscreen** to reopen a preview without relaunching; the catalog, search text, and navigation state remain underneath the cover. Opening from the catalog dismisses its active text editing without clearing the search or resetting the scroll position. The **Open Fullscreen** action is hidden when the host window cannot provide the return-to-catalog flow. To enable shake routing, host the catalog in `StorybookWindow(windowScene:)` from a UIKit `UIWindowSceneDelegate`; the default SwiftUI `WindowGroup` does not opt in. Register that scene delegate in the app's scene manifest or return it from `application(_:configurationForConnecting:options:)`. `StorybookWindow` handles the completed shake in `UIResponder.motionEnded(_:with:)` and routes it only to its active fullscreen page. It claims first-responder status only when no text field or text view is editing, preserving native editing and shake-to-undo. If another responder owns and consumes the event, Storybook cannot guarantee that the actions sheet opens. The event uses UIKit's responder chain; the window does not intercept or globally replace event dispatch. Mac Catalyst does not provide the shake actions sheet or **Open Fullscreen** context-menu action. No runtime command or keyboard shortcut is provided. macOS continues to use the sidebar detail view.
+On iOS and iPadOS, the fullscreen preview has a draggable circular control near the lower trailing edge. Drag it to move; it follows the finger and springs to the nearest screen edge when released. Tapping it opens a native action sheet with **Return to Catalog** and, when UIKit provides one for the presentation context, **Cancel**. Returning closes the fullscreen preview and presentations it opened; choosing Cancel when available or dismissing outside the sheet preserves the same preview and its state. The control uses a temporary, non-key, transparent pass-through window in the preview's existing scene. Storybook does not replace or subclass the host window, take key-window status, or intercept touches outside the control, so ordinary SwiftUI `WindowGroup` hosts work without additional setup and Preview-owned input remains native.
 
-Minimal UIKit scene setup:
-
-```swift
-let window = StorybookWindow(windowScene: windowScene)
-window.rootViewController = UIHostingController(rootView: Storybook())
-self.window = window
-window.makeKeyAndVisible()
-```
-
-The sample does not migrate saved scenes when switching from SwiftUI's `App`
-lifecycle to a UIKit scene delegate. After that lifecycle switch, uninstall and
-reinstall the sample once so iOS creates a fresh scene session.
+From the catalog, long-press a page row and choose **Open Fullscreen** to open it without relaunching. The catalog, search text, and navigation state remain underneath the cover. Opening from the catalog ends active catalog text editing without clearing the query or resetting the scroll position. Mac Catalyst keeps its existing push-navigation fallback and does not show **Open Fullscreen**; macOS continues to use the sidebar detail view.
 
 The iOS demo includes `#Preview("Navigation Stack Fullscreen")` in `Development/SwiftUIDemoApp/Component.swift` for checking a preview-owned stack and toolbar. Launch it with these distinct arguments:
 
@@ -286,7 +275,14 @@ SwiftUIDemoApp/Component.swift
 
 The expected page identifier is `storybook.page|27:Navigation Stack Fullscreen|30:SwiftUIDemoApp/Component.swift|58`.
 
-The `#Preview("Fullscreen Shake Interaction")` fixture at `SwiftUIDemoApp/Component.swift:80` has a focused text input and a Preview-owned sheet for exercising shake ownership and return behavior. Its expected page marker is `storybook.page|28:Fullscreen Shake Interaction|30:SwiftUIDemoApp/Component.swift|80`.
+The `#Preview("Fullscreen Shake Interaction")` fixture at `SwiftUIDemoApp/Component.swift:80` has a text input and Preview-owned sheet for checking input ownership, child presentations, and the floating control. Its expected page marker is `storybook.page|28:Fullscreen Shake Interaction|30:SwiftUIDemoApp/Component.swift|80`.
+
+Two colored fixtures isolate safe-area rendering. `Fullscreen Safe Area Plain` checks edge-to-edge indigo behind content positioned inside the safe area. `Fullscreen Safe Area Navigation Stack` uses teal on the root and pink on a pushed detail, with safe-area markers and toolbar actions on both. Their selectors and page markers are:
+
+- `Fullscreen Safe Area Plain`: `storybook.page|26:Fullscreen Safe Area Plain|30:SwiftUIDemoApp/Component.swift|203`
+- `Fullscreen Safe Area Navigation Stack`: `storybook.page|37:Fullscreen Safe Area Navigation Stack|30:SwiftUIDemoApp/Component.swift|207`
+
+Use `--storybook-fullscreen` with either selector, inspect the top and bottom color edges and safe-area labels, then push the detail in the NavigationStack fixture and repeat the check.
 
 After a page opens, its root exposes a deterministic accessibility identifier in this form:
 

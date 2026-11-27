@@ -199,4 +199,77 @@ private func longScrollingView() -> UIView {
 
   return root
 }
+
+#Preview("Fullscreen Safe Area Plain") {
+  FullscreenSafeAreaPlainPreview()
+}
+
+#Preview("Fullscreen Safe Area Navigation Stack") {
+  NavigationStack {
+    FullscreenSafeAreaNavigationRootPreview()
+  }
+}
+
+private struct FullscreenSafeAreaPlainPreview: View {
+
+  var body: some View {
+    ZStack {
+      Color.indigo.ignoresSafeArea()
+      SafeAreaPositionMarkers(title: "Plain Preview")
+    }
+  }
+}
+
+private struct FullscreenSafeAreaNavigationRootPreview: View {
+
+  @State private var showsDetail = false
+
+  var body: some View {
+    ZStack {
+      Color.teal.ignoresSafeArea()
+      SafeAreaPositionMarkers(title: "Navigation Root")
+    }
+    .navigationTitle("Safe Area Root")
+    .toolbar {
+      ToolbarItem(placement: .topBarTrailing) {
+        Button("Push detail") {
+          showsDetail = true
+        }
+        .accessibilityIdentifier("storybook.safeArea.pushDetail")
+      }
+    }
+    .navigationDestination(isPresented: $showsDetail) {
+      ZStack {
+        Color.pink.ignoresSafeArea()
+        SafeAreaPositionMarkers(title: "Navigation Detail")
+      }
+      .navigationTitle("Safe Area Detail")
+      .toolbar {
+        ToolbarItem(placement: .topBarTrailing) {
+          Button("Detail action") {}
+        }
+      }
+    }
+  }
+}
+
+private struct SafeAreaPositionMarkers: View {
+
+  let title: String
+
+  var body: some View {
+    VStack {
+      Text("Safe-area top")
+        .accessibilityIdentifier("storybook.safeArea.top")
+      Spacer()
+      Text(title)
+        .font(.title2)
+      Spacer()
+      Text("Safe-area bottom")
+        .accessibilityIdentifier("storybook.safeArea.bottom")
+    }
+    .padding(.vertical, 16)
+    .foregroundStyle(.white)
+  }
+}
 #endif
