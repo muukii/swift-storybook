@@ -531,9 +531,7 @@ class _ViewController<Content: View>: UIViewController {
     super.viewDidLoad()
 
     let hosting = UIHostingController(
-      rootView:
-        content
-        .environment(\.storybook_targetViewController, self)
+      rootView: content._storybookTargetViewController(StorybookControllerReference(self))
     )
 
     addChild(hosting)
