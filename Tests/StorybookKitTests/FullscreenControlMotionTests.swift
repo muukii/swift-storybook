@@ -64,4 +64,37 @@ struct FullscreenControlMotionTests {
     #expect(centerBounds.minY == 102)
     #expect(centerBounds.maxY == 460)
   }
+
+  @Test("A keyboard above safe-area center bounds does not invert them")
+  func nearTopKeyboardPreservesSafeAreaBounds() {
+    let centerBounds = FullscreenControlMotion.centerBounds(
+      in: CGRect(x: 0, y: 0, width: 402, height: 874),
+      safeAreaInsets: .init(top: 62, left: 0, bottom: 34, right: 0),
+      controlSize: CGSize(width: 56, height: 56),
+      margin: 12,
+      keyboardTop: 80
+    )
+
+    #expect(centerBounds.minY == 102)
+    #expect(centerBounds.maxY == 800)
+    #expect(centerBounds.minY >= 62)
+    #expect(centerBounds.height.isFinite)
+  }
+
+  @Test("An undersized safe area collapses at its midpoint")
+  func invertedCenterRangeStaysInsideSafeArea() {
+    let centerBounds = FullscreenControlMotion.centerBounds(
+      in: CGRect(x: 0, y: 0, width: 402, height: 100),
+      safeAreaInsets: .init(top: 62, left: 0, bottom: 34, right: 0),
+      controlSize: CGSize(width: 56, height: 56),
+      margin: 12,
+      keyboardTop: nil
+    )
+
+    #expect(centerBounds.minY == 64)
+    #expect(centerBounds.maxY == 64)
+    #expect(centerBounds.height == 0)
+    #expect(centerBounds.minY >= 62)
+    #expect(centerBounds.maxY <= 66)
+  }
 }

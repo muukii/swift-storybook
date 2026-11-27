@@ -74,6 +74,8 @@ scroll position remain, catalog editing ends, and Preview-owned input can still
 autofocus. Drag the control from its lower-trailing starting position, release
 with velocity toward each horizontal edge, and catch it while its spring is in
 flight. Touch and scroll outside the control to verify pass-through behavior.
+The control avoids a docked keyboard but does not move around a floating or
+undocked keyboard.
 
 Tap the control and verify the native action sheet. If UIKit shows **Cancel**,
 choose it; otherwise dismiss outside. Either dismissal must preserve the same

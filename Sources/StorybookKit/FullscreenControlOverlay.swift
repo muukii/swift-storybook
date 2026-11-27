@@ -146,7 +146,7 @@ private final class FullscreenControlOverlayViewController: UIViewController {
     super.viewDidLoad()
     view.backgroundColor = .clear
     view.isOpaque = false
-    view.keyboardLayoutGuide.followsUndockedKeyboard = true
+    view.keyboardLayoutGuide.followsUndockedKeyboard = false
   }
 
   override func viewDidLayoutSubviews() {
@@ -234,7 +234,11 @@ private final class FullscreenControlOverlayViewController: UIViewController {
 
   private var visibleKeyboardTop: CGFloat? {
     let frame = view.keyboardLayoutGuide.layoutFrame
-    guard frame.height > 0, frame.minY < view.bounds.maxY else { return nil }
+    guard frame.height > 0,
+      frame.minY < view.bounds.maxY
+    else {
+      return nil
+    }
     return frame.minY
   }
 
