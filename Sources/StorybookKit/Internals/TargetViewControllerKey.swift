@@ -18,20 +18,11 @@ private struct StorybookOpenFullScreenPageKey: EnvironmentKey {
 }
 
 extension EnvironmentValues {
-  @Entry private var storybook_controllerReference: StorybookControllerReference<UIViewController>?
-  @Entry var storybook_hostTargetViewControllerReference: StorybookControllerReference<UIViewController>?
+  @Entry var storybook_controllerReference: StorybookControllerReference<UIViewController>?
 
   public var storybook_targetViewController: UIViewController? {
-    get {
-      if let storybook_hostTargetViewControllerReference {
-        return storybook_hostTargetViewControllerReference.controller
-      }
-      return storybook_controllerReference?.controller
-    }
-    set {
-      storybook_controllerReference = newValue.map(StorybookControllerReference.init)
-      storybook_hostTargetViewControllerReference = nil
-    }
+    get { storybook_controllerReference?.controller }
+    set { storybook_controllerReference = newValue.map(StorybookControllerReference.init) }
   }
 
   var storybook_openFullScreenPage: (@MainActor (BookPage) -> Void)? {
@@ -44,31 +35,22 @@ extension View {
   func _storybookTargetViewController(
     _ reference: StorybookControllerReference<UIViewController>
   ) -> some View {
-    environment(\.storybook_hostTargetViewControllerReference, reference)
+    environment(\.storybook_controllerReference, reference)
   }
 }
 #elseif os(macOS)
 import AppKit
 
 extension EnvironmentValues {
-  @Entry private var storybook_controllerReference: StorybookControllerReference<NSViewController>?
-  @Entry var storybook_hostTargetViewControllerReference: StorybookControllerReference<NSViewController>?
+  @Entry var storybook_controllerReference: StorybookControllerReference<NSViewController>?
 
   /// The nearest Storybook controller used for native AppKit presentations.
   ///
   /// The environment does not retain the controller, so hosted content cannot
   /// create a cycle with the controller that owns it.
   public var storybook_targetViewController: NSViewController? {
-    get {
-      if let storybook_hostTargetViewControllerReference {
-        return storybook_hostTargetViewControllerReference.controller
-      }
-      return storybook_controllerReference?.controller
-    }
-    set {
-      storybook_controllerReference = newValue.map(StorybookControllerReference.init)
-      storybook_hostTargetViewControllerReference = nil
-    }
+    get { storybook_controllerReference?.controller }
+    set { storybook_controllerReference = newValue.map(StorybookControllerReference.init) }
   }
 }
 
@@ -76,7 +58,7 @@ extension View {
   func _storybookTargetViewController(
     _ reference: StorybookControllerReference<NSViewController>
   ) -> some View {
-    environment(\.storybook_hostTargetViewControllerReference, reference)
+    environment(\.storybook_controllerReference, reference)
   }
 }
 #endif

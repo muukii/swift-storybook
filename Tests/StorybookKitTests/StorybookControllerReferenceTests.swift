@@ -29,6 +29,24 @@ struct StorybookControllerReferenceTests {
     #expect(reference.value == nil)
   }
 
+  #if canImport(UIKit)
+  @Test("A bare UIViewController releases after its autorelease pool drains")
+  func bareViewControllerReleases() {
+    let reference = autoreleasepool {
+      WeakViewControllerReference(UIViewController())
+    }
+
+    #expect(reference.value == nil)
+  }
+
+  @Test("A plain UIHostingController child does not retain its parent")
+  func plainHostingChildReleasesWithParent() {
+    let reference = plainHostingChildParentReference()
+
+    #expect(reference.value == nil)
+  }
+  #endif
+
   private func environmentAfterTargetRelease() -> EnvironmentValues {
     var environment = EnvironmentValues()
     let controller = StorybookTestViewController()
@@ -40,15 +58,30 @@ struct StorybookControllerReferenceTests {
   private func loadedHostingControllerReference() -> WeakViewControllerReference<
     StorybookTestViewController
   > {
-    #if os(macOS)
-    _ = NSApplication.shared
-    #endif
+    autoreleasepool {
+      #if os(macOS)
+      _ = NSApplication.shared
+      #endif
 
-    let controller = _ViewController(content: Text("Lifecycle"))
-    let reference: WeakViewControllerReference<StorybookTestViewController> = .init(controller)
-    _ = controller.view
-    return reference
+      let controller = _ViewController(content: Text("Lifecycle"))
+      let reference: WeakViewControllerReference<StorybookTestViewController> = .init(controller)
+      _ = controller.view
+      return reference
+    }
   }
+
+  #if canImport(UIKit)
+  private func plainHostingChildParentReference() -> WeakViewControllerReference<UIViewController> {
+    autoreleasepool {
+      let parent = UIViewController()
+      let child = UIHostingController(rootView: Text("Control"))
+      parent.addChild(child)
+      parent.view.addSubview(child.view)
+      child.didMove(toParent: parent)
+      return WeakViewControllerReference(parent)
+    }
+  }
+  #endif
 }
 
 private final class WeakViewControllerReference<Controller: AnyObject> {
