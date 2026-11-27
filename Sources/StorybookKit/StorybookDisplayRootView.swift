@@ -52,6 +52,12 @@ public struct StorybookDisplayRootView: View {
       initialPresentation = .catalog
     case .page(let selector):
       initialPresentation = Self.resolve(selector, in: bookStore)
+    case .fullScreenPage(let selector):
+      initialPresentation = Self.resolve(
+        selector,
+        in: bookStore,
+        fullScreen: true
+      )
     case .invalid(let diagnostic):
       initialPresentation = .failure(.invalid(diagnostic))
     }
@@ -75,10 +81,12 @@ public struct StorybookDisplayRootView: View {
   @MainActor
   private static func resolve(
     _ selector: BookPageSelector,
-    in store: BookStore
+    in store: BookStore,
+    fullScreen: Bool = false
   ) -> BookInitialPresentation {
     do {
-      return .page(try store.resolve(selector))
+      let page = try store.resolve(selector)
+      return fullScreen ? .fullScreenPage(page) : .page(page)
     } catch let error as BookPageResolutionError {
       return .failure(.resolution(error))
     } catch {
@@ -111,6 +119,7 @@ private enum BookInitialPresentation {
   case automaticCatalog
   case catalog
   case page(BookPage)
+  case fullScreenPage(BookPage)
   case failure(StorybookLaunchFailure)
 }
 
@@ -213,6 +222,21 @@ private struct BookContainer: View {
         initialPage: page,
         shouldAutoOpenLastPage: false
       )
+    case .fullScreenPage(let page):
+      #if os(macOS)
+      BookSidebarCatalogView(
+        store: store,
+        initialPage: page,
+        shouldAutoOpenLastPage: false
+      )
+      #else
+      BookCatalogView(
+        store: store,
+        initialPage: nil,
+        shouldAutoOpenLastPage: false,
+        initialFullScreenPage: page
+      )
+      #endif
     case .failure(let failure):
       StorybookLaunchFailureView(failure: failure)
     }
@@ -257,6 +281,7 @@ private struct BookCatalogView: View {
   @State private var result: [Book.Node] = []
   @State private var currentTask: Task<Void, Error>?
   @State private var showSettings: Bool = false
+  @State private var fullScreenPage: BookPage?
   @State private var path: NavigationPath
 
   @Environment(\.storybook_targetViewController) private var targetViewController
@@ -267,10 +292,12 @@ private struct BookCatalogView: View {
   init(
     store: BookStore,
     initialPage: BookPage?,
-    shouldAutoOpenLastPage: Bool
+    shouldAutoOpenLastPage: Bool,
+    initialFullScreenPage: BookPage? = nil
   ) {
     self.store = store
     self.shouldAutoOpenLastPage = shouldAutoOpenLastPage
+    self._fullScreenPage = .init(initialValue: initialFullScreenPage)
 
     var initialPath = NavigationPath()
     if let initialPage {
@@ -345,6 +372,10 @@ private struct BookCatalogView: View {
           .frame(minWidth: 400, minHeight: 220)
           #endif
       }
+    }
+    .fullScreenCover(item: $fullScreenPage) { page in
+      BookPageDestination(page: page, presentation: .fullScreen)
+        .environment(\.bookContext, store)
     }
     .environment(\.bookContext, store)
     .environment(\.appearanceContext, appearanceContext)

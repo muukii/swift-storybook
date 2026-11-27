@@ -21,12 +21,15 @@ Use these arguments:
 --storybook
 --storybook <name>
 --storybook --storybook-name=<name>
+--storybook <name> --storybook-fullscreen
 --storybook <name> --storybook-file <fileID>
 --storybook <name> --storybook-file <fileID> --storybook-line <line>
+--storybook <name> --storybook-fullscreen --storybook-file <fileID> --storybook-line <line>
 ```
 
 - Use `--storybook` alone only when the catalog is the requested result.
 - Pass the page name as the positional value immediately after `--storybook`.
+- Add `--storybook-fullscreen` after the page name to verify a UIKit preview without Storybook's navigation presentation.
 - For an empty or hyphen-led name, pass one exact argument in the form
   `--storybook-name=<name>` after `--storybook`.
 - Treat `<fileID>` as the compiler source identifier, commonly `Module/Path/File.swift`.

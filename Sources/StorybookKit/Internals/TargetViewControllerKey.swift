@@ -1,5 +1,9 @@
 import SwiftUI
 
+extension EnvironmentValues {
+  @Entry var storybook_isFullScreenPresentation = false
+}
+
 #if canImport(UIKit)
 extension EnvironmentValues {
   @Entry public var storybook_targetViewController: UIViewController?

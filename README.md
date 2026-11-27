@@ -247,11 +247,31 @@ The standard arguments are:
 --storybook
 --storybook <page-name>
 --storybook --storybook-name=<page-name>
+--storybook <page-name> --storybook-fullscreen
 --storybook <page-name> --storybook-file <module/file.swift>
 --storybook <page-name> --storybook-file <module/file.swift> --storybook-line <line>
+--storybook <page-name> --storybook-fullscreen --storybook-file <module/file.swift> --storybook-line <line>
 ```
 
 `--storybook` opens the catalog. Supply each token above as a distinct process argument; a page name containing spaces remains one argument. The positional form is convenient for ordinary names; use the single argument `--storybook-name=<page-name>` when the exact name is empty or begins with `-`. A name-only page request succeeds only when exactly one page has that name. Add the compiler-emitted `#fileID`, then the declaration line when necessary, to disambiguate duplicate names. Supplied page names and file identifiers are matched by their original UTF-8 bytes, without trimming, Unicode normalization, case folding, fuzzy search, or order-dependent fallback. Not-found and ambiguous requests remain visible in Storybook with candidate source locations and reusable launch-argument entries instead of opening another page. Pages that share the same name, file ID, and line must be given a unique declaration name or source location; Storybook does not choose between indistinguishable declarations.
+
+Add `--storybook-fullscreen` after a page name to open that page without Storybook's navigation presentation. On UIKit, this uses a full-screen cover and displays the preview without Storybook's `NavigationStack`, title, appearance toolbar, or outer scrolling container; a preview-owned `NavigationStack` then supplies its own navigation and toolbar. Existing page requests continue to use push navigation. On macOS, the request selects the page in the existing sidebar detail view.
+
+Storybook does not yet provide a return-to-catalog control, gesture, or runtime command for this fullscreen mode.
+
+The iOS demo includes `#Preview("Navigation Stack Fullscreen")` in `Development/SwiftUIDemoApp/Component.swift` for checking a preview-owned stack and toolbar. Launch it with these distinct arguments:
+
+```text
+--storybook
+Navigation Stack Fullscreen
+--storybook-fullscreen
+--storybook-file
+SwiftUIDemoApp/Component.swift
+--storybook-line
+58
+```
+
+The expected page identifier is `storybook.page|27:Navigation Stack Fullscreen|30:SwiftUIDemoApp/Component.swift|58`.
 
 After a page opens, its root exposes a deterministic accessibility identifier in this form:
 

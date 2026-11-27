@@ -54,21 +54,13 @@ struct PreviewRegistryWrapper: Comparable {
         return {
           VStack {
             AnyView(makeBody())
-              .toolbar {
-                ToolbarItem(placement: sourceLocationPlacement) {
-                  Menu {
-                    Button {
-                      copySourceLocation()
-                    } label: {
-                      Text("\(fileID):\(line)")
-                        .font(.caption.monospacedDigit())
-                    }
-                  } label: {
-                    Image(systemName: "info.circle")
-                  }
-
-                }
-              }
+              .modifier(
+                PreviewSourceLocationToolbar(
+                  fileID: fileID,
+                  line: line,
+                  placement: sourceLocationPlacement
+                )
+              )
           }
         }
 
@@ -185,21 +177,13 @@ struct PreviewRegistryWrapper: Comparable {
       return {
         VStack {
           AnyView(makeBody())
-            .toolbar {
-              ToolbarItem(placement: sourceLocationPlacement) {
-                Menu {
-                  Button {
-                    copySourceLocation()
-                  } label: {
-                    Text("\(fileID):\(line)")
-                      .font(.caption.monospacedDigit())
-                  }
-                } label: {
-                  Image(systemName: "info.circle")
-                }
-
-              }
-            }
+            .modifier(
+              PreviewSourceLocationToolbar(
+                fileID: fileID,
+                line: line,
+                placement: sourceLocationPlacement
+              )
+            )
         }
       }
 
@@ -508,8 +492,7 @@ struct PreviewRegistryWrapper: Comparable {
   }
 
   @MainActor
-  private func copySourceLocation() {
-    let location = "\(fileID):\(line)"
+  private static func copySourceLocation(_ location: String) {
     #if canImport(UIKit)
     UIPasteboard.general.string = location
     #elseif canImport(AppKit)
@@ -652,5 +635,43 @@ struct PreviewRegistryWrapper: Comparable {
       return _openExistential(closure, do: invoke)
     }
 
+  }
+
+  private struct PreviewSourceLocationToolbar: ViewModifier {
+
+    @Environment(\.storybook_isFullScreenPresentation) private var isFullScreenPresentation
+
+    private let fileID: String
+    private let line: Int
+    private let placement: ToolbarItemPlacement
+
+    init(
+      fileID: String,
+      line: Int,
+      placement: ToolbarItemPlacement
+    ) {
+      self.fileID = fileID
+      self.line = line
+      self.placement = placement
+    }
+
+    func body(content: Content) -> some View {
+      content.toolbar {
+        if isFullScreenPresentation == false {
+          ToolbarItem(placement: placement) {
+            Menu {
+              Button {
+                PreviewRegistryWrapper.copySourceLocation("\(fileID):\(line)")
+              } label: {
+                Text("\(fileID):\(line)")
+                  .font(.caption.monospacedDigit())
+              }
+            } label: {
+              Image(systemName: "info.circle")
+            }
+          }
+        }
+      }
+    }
   }
 }

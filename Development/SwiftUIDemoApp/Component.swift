@@ -55,6 +55,28 @@ import UIKit
   longScrollingView()
 }
 
+#Preview("Navigation Stack Fullscreen") {
+  NavigationStack {
+    List {
+      NavigationLink("Push a destination") {
+        VStack(alignment: .leading, spacing: 16) {
+          Text("Preview-owned destination")
+            .font(.title2)
+          Text("This page was pushed by the Preview's NavigationStack.")
+        }
+        .navigationTitle("Preview Detail")
+        .toolbar {
+          Button("Detail action") {}
+        }
+      }
+    }
+    .navigationTitle("Preview Navigation")
+    .toolbar {
+      Button("Preview action") {}
+    }
+  }
+}
+
 @MainActor
 private func longScrollingView() -> UIView {
   let root = UIView()
