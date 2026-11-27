@@ -22,9 +22,63 @@
 import Foundation
 import StorybookKit
 import SwiftUI
+#if canImport(UIKit)
+import UIKit
+#endif
 
+#if canImport(UIKit) && !targetEnvironment(macCatalyst)
+@main
+@MainActor
+final class SwiftUIDemoAppDelegate: UIResponder, UIApplicationDelegate {
+
+  func application(
+    _ application: UIApplication,
+    configurationForConnecting session: UISceneSession,
+    options: UIScene.ConnectionOptions
+  ) -> UISceneConfiguration {
+    let configuration = UISceneConfiguration(
+      name: "Storybook Window Scene",
+      sessionRole: session.role
+    )
+    configuration.delegateClass = SwiftUIDemoSceneDelegate.self
+    return configuration
+  }
+}
+
+@MainActor
+final class SwiftUIDemoSceneDelegate: UIResponder, UIWindowSceneDelegate {
+
+  var window: UIWindow?
+
+  func scene(
+    _ scene: UIScene,
+    willConnectTo session: UISceneSession,
+    options connectionOptions: UIScene.ConnectionOptions
+  ) {
+    guard let windowScene = scene as? UIWindowScene else { return }
+
+    let window = StorybookWindow(windowScene: windowScene)
+    window.rootViewController = UIHostingController(rootView: SwiftUIDemoRootView())
+    self.window = window
+    window.makeKeyAndVisible()
+  }
+}
+#else
 @main
 struct SwiftUIDemoAppApp: App {
+
+  var body: some Scene {
+    WindowGroup {
+      SwiftUIDemoRootView()
+    }
+    #if os(macOS)
+    .defaultSize(width: 960, height: 700)
+    #endif
+  }
+}
+#endif
+
+private struct SwiftUIDemoRootView: View {
 
   private let storybookLaunchRequest: StorybookLaunchRequest?
   #if canImport(UIKit)
@@ -52,42 +106,35 @@ struct SwiftUIDemoAppApp: App {
     #endif
   }
 
-  var body: some Scene {
-    WindowGroup {
-      #if canImport(UIKit)
-      switch viewportExportRequest {
-      case .disabled:
-        if let storybookLaunchRequest {
-          Storybook(launchRequest: storybookLaunchRequest)
-        } else {
-          ContentView()
-        }
-      case .invalid(let message, _):
-        StorybookViewportExportFailureView(message: message)
-      case .request(let request):
-        if let viewportExportPreparationFailure {
-          StorybookViewportExportFailureView(
-            message: viewportExportPreparationFailure
-          )
-        } else if let selector = storybookLaunchRequest?.pageSelector {
-          StorybookViewportExportView(
-            selector: selector,
-            exportID: request.exportID,
-            appearance: request.appearance
-          )
-        } else {
-          StorybookViewportExportFailureView(
-            message: "Viewport export requires an exact Storybook page selector."
-          )
-        }
+  var body: some View {
+    #if canImport(UIKit)
+    switch viewportExportRequest {
+    case .disabled:
+      if let storybookLaunchRequest {
+        Storybook(launchRequest: storybookLaunchRequest)
+      } else {
+        ContentView()
       }
-      #else
-      Storybook(launchRequest: storybookLaunchRequest ?? .catalog)
-        .frame(minWidth: 640, minHeight: 480)
-      #endif
+    case .invalid(let message, _):
+      StorybookViewportExportFailureView(message: message)
+    case .request(let request):
+      if let viewportExportPreparationFailure {
+        StorybookViewportExportFailureView(message: viewportExportPreparationFailure)
+      } else if let selector = storybookLaunchRequest?.pageSelector {
+        StorybookViewportExportView(
+          selector: selector,
+          exportID: request.exportID,
+          appearance: request.appearance
+        )
+      } else {
+        StorybookViewportExportFailureView(
+          message: "Viewport export requires an exact Storybook page selector."
+        )
+      }
     }
-    #if os(macOS)
-    .defaultSize(width: 960, height: 700)
+    #else
+    Storybook(launchRequest: storybookLaunchRequest ?? .catalog)
+      .frame(minWidth: 640, minHeight: 480)
     #endif
   }
 }

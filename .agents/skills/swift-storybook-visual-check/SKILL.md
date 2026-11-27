@@ -64,15 +64,27 @@ presentation. For those behaviors, launch the qualified page with
 exercise the relevant interaction. Use viewport exports only for isolated
 content and layout checks.
 
-For fullscreen return-flow checks, open a catalog row's context menu and select
-**Open Fullscreen** so the test can verify that search and list navigation state
-survive returning. In a live Simulator, exercise shake with no text input
-focused, Cancel, swipe dismissal, repeated shakes while the actions sheet is
-open, and Return to Catalog while a Preview-owned presentation is open. Also
-test a focused text field/text view: do not take its first-responder status;
-shake may be consumed for text editing, and the entered text and focus must not
-be disturbed. After editing ends, verify the fullscreen actions are available
-again. Viewport exports cannot cover these interactions.
+For fullscreen return-flow checks, use an iOS/iPadOS host whose scene creates a
+`StorybookWindow`; a default SwiftUI `WindowGroup` does not enable shake
+routing and hides **Open Fullscreen**. Open a catalog row's context menu and
+select **Open Fullscreen** so the test can verify that search and list
+navigation state survive returning. Search for `e`, scroll the results, then
+open **Open Fullscreen** from a row while the catalog search field is active.
+Verify the search text and scroll position remain, catalog editing ends, and
+shake opens the actions sheet; preview-owned input autofocus must still work.
+In a live Simulator, exercise shake with no text input focused, Cancel, swipe
+dismissal, repeated shakes while the actions sheet is open, and Return to
+Catalog while a Preview-owned presentation is open. Also test a focused text
+field/text view: do not take its first-responder status; shake may be consumed
+for text editing, and the entered text and focus must not be disturbed. After
+editing ends, verify the fullscreen actions are available again. The window
+handles completed shakes through `UIResponder.motionEnded(_:with:)`; if another
+responder owns and consumes the event, the action sheet is not guaranteed.
+Viewport exports cannot cover these interactions.
+
+After switching the demo from SwiftUI's `App` lifecycle to a UIKit scene
+delegate, reinstall it once before testing; the sample does not migrate saved
+scene sessions.
 
 ## Capture evidence
 

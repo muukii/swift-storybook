@@ -288,11 +288,21 @@ private struct BookCatalogView: View {
   @State private var currentTask: Task<Void, Error>?
   @State private var showSettings: Bool = false
   @State private var fullScreenPage: BookPage?
+  @State private var supportsFullscreenReturn = false
+  @State private var fullScreenWindowSession = StorybookWindowSession()
   @State private var path: NavigationPath
 
   @Environment(\.storybook_targetViewController) private var targetViewController
 
   @State private var appearanceContext = AppearanceContext()
+
+  private var openFullScreenPageAction: (@MainActor (BookPage) -> Void)? {
+    guard supportsFullscreenReturn else { return nil }
+    return { page in
+      targetViewController?.view.window?.endEditing(true)
+      fullScreenPage = page
+    }
+  }
 
   @MainActor
   init(
@@ -379,16 +389,18 @@ private struct BookCatalogView: View {
           #endif
       }
     }
-    .environment(\.storybook_openFullScreenPage, { page in
-      fullScreenPage = page
-    })
-    .fullScreenCover(item: $fullScreenPage) { page in
+    .environment(\.storybook_openFullScreenPage, openFullScreenPageAction)
+    .fullScreenCover(
+      item: $fullScreenPage,
+      onDismiss: { fullScreenWindowSession.deactivate() }
+    ) { page in
       _ViewControllerHost {
         _FullScreenPageViewController(
           content:
             BookPageDestination(page: page, presentation: .fullScreen)
               .environment(\.bookContext, store)
               .environment(\.appearanceContext, appearanceContext),
+          windowSession: fullScreenWindowSession,
           onReturnToCatalog: {
             fullScreenPage = nil
           }
@@ -407,6 +419,10 @@ private struct BookCatalogView: View {
       targetViewController?.children.forEach { $0.overrideUserInterfaceStyle = style }
     }
     .onAppear {
+      #if canImport(UIKit) && !targetEnvironment(macCatalyst)
+      supportsFullscreenReturn = targetViewController?.view.window is StorybookWindow
+      #endif
+
       guard shouldAutoOpenLastPage, autoOpenLastPage else {
         return
       }
@@ -573,20 +589,22 @@ private struct FullScreenOperationsSheet: View {
 }
 
 private final class _FullScreenPageViewController<Content: View>: _ViewController<Content>,
-  UIAdaptivePresentationControllerDelegate
+  UIAdaptivePresentationControllerDelegate,
+  StorybookWindowMotionHandler
 {
 
   private let onReturnToCatalog: @MainActor () -> Void
+  private let windowSession: StorybookWindowSession
   private var operationsSheet: UIHostingController<FullScreenOperationsSheet>?
-  private var editingTextInputs = Set<ObjectIdentifier>()
   private var hasReturnedToCatalog = false
 
-  override var canBecomeFirstResponder: Bool {
-    true
-  }
-
-  init(content: Content, onReturnToCatalog: @escaping @MainActor () -> Void) {
+  init(
+    content: Content,
+    windowSession: StorybookWindowSession,
+    onReturnToCatalog: @escaping @MainActor () -> Void
+  ) {
     self.onReturnToCatalog = onReturnToCatalog
+    self.windowSession = windowSession
     super.init(content: content)
   }
 
@@ -594,50 +612,13 @@ private final class _FullScreenPageViewController<Content: View>: _ViewControlle
     fatalError("init(coder:) has not been implemented")
   }
 
-  override func viewDidLoad() {
-    super.viewDidLoad()
-
-    NotificationCenter.default.addObserver(
-      self,
-      selector: #selector(textInputDidBeginEditing(_:)),
-      name: UITextField.textDidBeginEditingNotification,
-      object: nil
-    )
-    NotificationCenter.default.addObserver(
-      self,
-      selector: #selector(textInputDidEndEditing(_:)),
-      name: UITextField.textDidEndEditingNotification,
-      object: nil
-    )
-    NotificationCenter.default.addObserver(
-      self,
-      selector: #selector(textInputDidBeginEditing(_:)),
-      name: UITextView.textDidBeginEditingNotification,
-      object: nil
-    )
-    NotificationCenter.default.addObserver(
-      self,
-      selector: #selector(textInputDidEndEditing(_:)),
-      name: UITextView.textDidEndEditingNotification,
-      object: nil
-    )
-  }
-
   override func viewDidAppear(_ animated: Bool) {
     super.viewDidAppear(animated)
-    restoreFirstResponderIfAvailable()
+    windowSession.activate(window: view.window, handler: self)
   }
 
-  override func motionEnded(_ motion: UIEvent.EventSubtype, with event: UIEvent?) {
-    guard motion == .motionShake,
-      isFirstResponder,
-      view.window?.isKeyWindow == true,
-      hasReturnedToCatalog == false
-    else {
-      super.motionEnded(motion, with: event)
-      return
-    }
-
+  func storybookWindowDidReceiveShake() {
+    guard hasReturnedToCatalog == false else { return }
     presentOperationsSheetIfNeeded()
   }
 
@@ -647,40 +628,7 @@ private final class _FullScreenPageViewController<Content: View>: _ViewControlle
     }
 
     operationsSheet = nil
-    restoreFirstResponderIfAvailable()
-  }
-
-  @objc private func textInputDidBeginEditing(_ notification: Notification) {
-    guard let textInput = notification.object as? UIView,
-      let window = view.window,
-      textInput.window === window
-    else {
-      return
-    }
-
-    editingTextInputs.insert(ObjectIdentifier(textInput))
-  }
-
-  @objc private func textInputDidEndEditing(_ notification: Notification) {
-    guard let textInput = notification.object as? UIView else { return }
-
-    guard editingTextInputs.remove(ObjectIdentifier(textInput)) != nil else { return }
-    Task { @MainActor [weak self] in
-      self?.restoreFirstResponderIfAvailable()
-    }
-  }
-
-  private func restoreFirstResponderIfAvailable() {
-    guard hasReturnedToCatalog == false,
-      editingTextInputs.isEmpty,
-      operationsSheet == nil,
-      view.window?.isKeyWindow == true,
-      isFirstResponder == false
-    else {
-      return
-    }
-
-    becomeFirstResponder()
+    windowSession.restoreFirstResponderIfAvailable()
   }
 
   private func presentOperationsSheetIfNeeded() {
@@ -706,6 +654,7 @@ private final class _FullScreenPageViewController<Content: View>: _ViewControlle
         onReturnToCatalog: { [weak self] in
           guard let self else { return }
           self.hasReturnedToCatalog = true
+          self.windowSession.deactivate(self)
           self.onReturnToCatalog()
         },
         onCancel: { [weak self] in
@@ -744,7 +693,7 @@ private final class _FullScreenPageViewController<Content: View>: _ViewControlle
       }
 
       self.operationsSheet = nil
-      self.restoreFirstResponderIfAvailable()
+      self.windowSession.restoreFirstResponderIfAvailable()
     }
   }
 
