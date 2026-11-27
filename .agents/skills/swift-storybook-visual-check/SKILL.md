@@ -53,10 +53,22 @@ Selection is exact. Do not guess, fuzzy-match, or choose the first duplicate. St
 
 Use the host's own scheme, bundle identifier, and supported simulator. Do not assume a particular repository, Xcode integration, command wrapper, or device-control tool.
 
+## Navigation, toolbar, and fullscreen checks
+
+Viewport exports call `makeViewPortPreview()` and render a preview factory
+directly, without running `BookPageDestination` or UIKit's `fullScreenCover`.
+They cannot verify a preview-owned `NavigationStack`, navigation toolbars,
+fullscreen presentation, Storybook chrome suppression, or controller/modal
+presentation. For those behaviors, launch the qualified page with
+`--storybook-fullscreen` in a live Simulator, inspect the hierarchy, and
+exercise the relevant interaction. Use viewport exports only for isolated
+content and layout checks.
+
 ## Capture evidence
 
-Prefer a viewport artifact when the host supports it: it excludes Storybook
-chrome, fits a root `ScrollView` to full height, and exports a
+For isolated content and layout checks, prefer a viewport artifact when the host
+supports it: it excludes Storybook chrome, fits a root `ScrollView` to full
+height, and exports a
 `UIViewController` as its whole presented window (`renderMode:
 presentedViewController`). Launch a fully qualified page with:
 
