@@ -56,39 +56,15 @@ enum FullscreenControlMotion {
   }
 
   static func snapTarget(
-    from center: CGPoint,
-    velocity: CGPoint,
-    centerBounds: CGRect,
-    projectionDuration: CGFloat = 0.2,
-    cancelled: Bool = false
+    projectedPosition: CGPoint,
+    centerBounds: CGRect
   ) -> CGPoint {
-    let velocity = cancelled ? .zero : velocity
-    let projectedX = clamp(
-      center.x + velocity.x * projectionDuration,
-      minimum: centerBounds.minX,
-      maximum: centerBounds.maxX
-    )
-    let projectedY = clamp(
-      center.y + velocity.y * projectionDuration,
-      minimum: centerBounds.minY,
-      maximum: centerBounds.maxY
-    )
+    let projected = clamp(projectedPosition, to: centerBounds)
 
     return CGPoint(
-      x: projectedX < centerBounds.midX ? centerBounds.minX : centerBounds.maxX,
-      y: projectedY
+      x: projected.x < centerBounds.midX ? centerBounds.minX : centerBounds.maxX,
+      y: projected.y
     )
-  }
-
-  static func normalizedInitialVelocity(velocity: CGFloat, distance: CGFloat) -> CGFloat {
-    guard velocity.isFinite,
-      distance.isFinite,
-      abs(distance) > .ulpOfOne
-    else {
-      return 0
-    }
-
-    return velocity / distance
   }
 
   static func clamp(_ point: CGPoint, to bounds: CGRect) -> CGPoint {

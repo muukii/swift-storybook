@@ -75,7 +75,7 @@ private final class FullscreenControlOverlayViewController: UIViewController {
     effect: UIBlurEffect(style: .systemThinMaterial)
   )
   private let button = UIButton(type: .system)
-  private var snapAnimator: UIViewPropertyAnimator?
+  private lazy var animator = FloatingViewAnimator(view: control)
   private var dragOffset = CGPoint.zero
   private var isDragging = false
   private var hasPosition = false
@@ -170,10 +170,15 @@ private final class FullscreenControlOverlayViewController: UIViewController {
       control.center = CGPoint(x: bounds.maxX, y: bounds.maxY)
       hasPosition = true
     } else {
-      interruptSnap()
-      control.center = FullscreenControlMotion.clamp(control.center, to: bounds)
-      if isDragging == false {
-        settle(velocity: .zero, cancelled: true)
+      animator.stop()
+      if isDragging {
+        control.center = FullscreenControlMotion.clamp(control.center, to: bounds)
+      } else {
+        let target = FullscreenControlMotion.snapTarget(
+          projectedPosition: control.center,
+          centerBounds: bounds
+        )
+        animator.relayout(to: target)
       }
     }
   }
@@ -184,14 +189,14 @@ private final class FullscreenControlOverlayViewController: UIViewController {
   }
 
   @objc private func menuButtonTapped() {
-    interruptSnap()
+    animator.stop()
     onMenuTap(button)
   }
 
   @objc private func handlePan(_ gesture: UIPanGestureRecognizer) {
     switch gesture.state {
     case .began:
-      interruptSnap()
+      animator.stop()
       let location = gesture.location(in: view)
       dragOffset = CGPoint(
         x: control.center.x - location.x,
@@ -210,10 +215,10 @@ private final class FullscreenControlOverlayViewController: UIViewController {
       )
     case .ended:
       isDragging = false
-      settle(velocity: gesture.velocity(in: view), cancelled: false)
+      settle(velocity: gesture.velocity(in: view))
     case .cancelled:
       isDragging = false
-      settle(velocity: .zero, cancelled: true)
+      settle(velocity: .zero)
     case .failed, .possible:
       break
     @unknown default:
@@ -255,72 +260,13 @@ private final class FullscreenControlOverlayViewController: UIViewController {
     )
   }
 
-  private func settle(velocity: CGPoint, cancelled: Bool) {
-    let current = control.center
+  private func settle(velocity: CGPoint) {
     let bounds = centerBounds(safeAreaInsets: resolvedSafeAreaInsets, keyboardTop: visibleKeyboardTop)
     let target = FullscreenControlMotion.snapTarget(
-      from: current,
-      velocity: velocity,
-      centerBounds: bounds,
-      cancelled: cancelled
+      projectedPosition: FloatingViewAnimator.projectedPosition(from: control.center, velocity: velocity),
+      centerBounds: bounds
     )
-
-    guard target != current else { return }
-
-    if UIAccessibility.isReduceMotionEnabled {
-      let animator = UIViewPropertyAnimator(duration: 0.22, curve: .easeOut) { [weak control] in
-        control?.center = target
-      }
-      animator.isUserInteractionEnabled = true
-      animator.isManualHitTestingEnabled = true
-      snapAnimator = animator
-      animator.addCompletion { [weak self, weak animator] _ in
-        guard let self, self.snapAnimator === animator else { return }
-        self.snapAnimator = nil
-      }
-      animator.startAnimation()
-      return
-    }
-
-    let initialVelocity = CGVector(
-      dx: FullscreenControlMotion.normalizedInitialVelocity(
-        velocity: velocity.x,
-        distance: target.x - current.x
-      ),
-      dy: FullscreenControlMotion.normalizedInitialVelocity(
-        velocity: velocity.y,
-        distance: target.y - current.y
-      )
-    )
-    let timing = UISpringTimingParameters(
-      mass: 1,
-      stiffness: 260,
-      damping: 28,
-      initialVelocity: initialVelocity
-    )
-    let animator = UIViewPropertyAnimator(duration: 0, timingParameters: timing)
-    animator.addAnimations { [weak control] in
-      control?.center = target
-    }
-    animator.isUserInteractionEnabled = true
-    animator.isManualHitTestingEnabled = true
-    snapAnimator = animator
-    animator.addCompletion { [weak self, weak animator] _ in
-      guard let self, self.snapAnimator === animator else { return }
-      self.snapAnimator = nil
-    }
-    animator.startAnimation()
-  }
-
-  private func interruptSnap() {
-    guard let snapAnimator else { return }
-    let presentationPosition = control.layer.presentation()?.position
-    snapAnimator.stopAnimation(true)
-    self.snapAnimator = nil
-
-    if let presentationPosition {
-      control.center = presentationPosition
-    }
+    animator.settle(at: target, velocity: velocity)
   }
 }
 

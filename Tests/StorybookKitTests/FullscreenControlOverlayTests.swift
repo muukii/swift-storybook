@@ -59,18 +59,12 @@ struct FullscreenControlOverlayTests {
     window.isHidden = false
     window.layoutIfNeeded()
 
-    let animator = UIViewPropertyAnimator(duration: 2, curve: .linear) {
-      control.center = CGPoint(x: 148, y: 248)
-    }
-    animator.isUserInteractionEnabled = true
-    animator.isManualHitTestingEnabled = true
-    animator.startAnimation()
-    animator.pauseAnimation()
-    animator.fractionComplete = 0.5
+    let animator = FloatingViewAnimator(view: control)
+    animator.settle(at: CGPoint(x: 148, y: 248), velocity: CGPoint(x: 400, y: 600))
     CATransaction.flush()
 
     defer {
-      animator.stopAnimation(true)
+      animator.stop()
       window.isHidden = true
       window.rootViewController = nil
     }
@@ -86,6 +80,8 @@ struct FullscreenControlOverlayTests {
           with: nil
         ) === button
       )
+      animator.stop()
+      #expect(control.frame == presentationFrame)
     }
   }
 }
