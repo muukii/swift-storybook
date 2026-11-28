@@ -40,7 +40,7 @@ struct FullscreenControlOverlayTests {
   }
 
   @Test("The animating control is hit at its presentation position")
-  func overlayHitsControlDuringSnap() {
+  func overlayHitsControlDuringSnap() throws {
     let window = FullscreenControlOverlayWindow(
       frame: CGRect(x: 0, y: 0, width: 200, height: 300)
     )
@@ -59,8 +59,15 @@ struct FullscreenControlOverlayTests {
     window.isHidden = false
     window.layoutIfNeeded()
 
+    let startFrame = control.frame
+    let startTime = control.layer.convertTime(CACurrentMediaTime(), from: nil)
+    control.layer.speed = 0
+    control.layer.timeOffset = startTime
+
     let animator = FloatingViewAnimator(view: control)
     animator.settle(at: CGPoint(x: 148, y: 248), velocity: CGPoint(x: 400, y: 600))
+    CATransaction.flush()
+    control.layer.timeOffset = startTime + 0.1
     CATransaction.flush()
 
     defer {
@@ -69,20 +76,17 @@ struct FullscreenControlOverlayTests {
       window.rootViewController = nil
     }
 
-    let presentationFrame = control.layer.presentation()?.frame
-    #expect(presentationFrame != nil)
-
-    if let presentationFrame {
-      #expect(presentationFrame != control.frame)
-      #expect(
-        window.hitTest(
-          CGPoint(x: presentationFrame.midX, y: presentationFrame.midY),
-          with: nil
-        ) === button
-      )
-      animator.stop()
-      #expect(control.frame == presentationFrame)
-    }
+    let presentationFrame = try #require(control.layer.presentation()?.frame)
+    #expect(presentationFrame != startFrame)
+    #expect(presentationFrame != control.frame)
+    #expect(
+      window.hitTest(
+        CGPoint(x: presentationFrame.midX, y: presentationFrame.midY),
+        with: nil
+      ) === button
+    )
+    animator.stop()
+    #expect(control.frame == presentationFrame)
   }
 }
 #endif
