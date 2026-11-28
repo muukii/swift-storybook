@@ -42,10 +42,12 @@ public struct BookPush: BookView {
   }
 
   public var body: some View {
+    let targetViewControllerReference = StorybookControllerReference(targetViewController)
+    let viewControllerBlock = pushingViewControllerBlock
 
     NavigationLink(title, destination: {
-      _ViewControllerHost(instantiate: pushingViewControllerBlock)
-        .environment(\.storybook_targetViewController, targetViewController)
+      _ViewControllerHost(instantiate: viewControllerBlock)
+        ._storybookTargetViewController(targetViewControllerReference)
     })
 
   }

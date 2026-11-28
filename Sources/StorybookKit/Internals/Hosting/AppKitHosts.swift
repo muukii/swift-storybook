@@ -214,7 +214,7 @@ final class _ViewController<Content: View>: NSViewController {
   override func loadView() {
     view = NSView()
     let hosting = NSHostingController(
-      rootView: content.environment(\.storybook_targetViewController, self)
+      rootView: content._storybookTargetViewController(StorybookControllerReference(self))
     )
     addChild(hosting)
     hosting.view.translatesAutoresizingMaskIntoConstraints = false

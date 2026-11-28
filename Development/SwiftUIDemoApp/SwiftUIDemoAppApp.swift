@@ -69,7 +69,7 @@ struct SwiftUIDemoAppApp: App {
           StorybookViewportExportFailureView(
             message: viewportExportPreparationFailure
           )
-        } else if case .page(let selector) = storybookLaunchRequest {
+        } else if let selector = storybookLaunchRequest?.pageSelector {
           StorybookViewportExportView(
             selector: selector,
             exportID: request.exportID,
@@ -89,5 +89,19 @@ struct SwiftUIDemoAppApp: App {
     #if os(macOS)
     .defaultSize(width: 960, height: 700)
     #endif
+  }
+}
+
+private extension StorybookLaunchRequest {
+
+  var pageSelector: BookPageSelector? {
+    switch self {
+    case .page(let selector), .fullScreenPage(let selector):
+      selector
+    case .catalog, .invalid:
+      nil
+    @unknown default:
+      nil
+    }
   }
 }

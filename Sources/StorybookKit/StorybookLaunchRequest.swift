@@ -37,11 +37,17 @@ public enum StorybookLaunchRequest: Equatable, Sendable {
   /// The optional argument that qualifies a page name and file by source line.
   public static let lineArgument = "--storybook-line"
 
+  /// Opens a selected page without Storybook's navigation presentation.
+  public static let fullScreenArgument = "--storybook-fullscreen"
+
   /// Opens the Storybook catalog.
   case catalog
 
   /// Opens the one page that exactly matches the selector.
   case page(BookPageSelector)
+
+  /// Opens the selected page in a full-screen presentation.
+  case fullScreenPage(BookPageSelector)
 
   /// Displays a diagnostic instead of opening a potentially unintended page.
   case invalid(StorybookLaunchDiagnostic)
@@ -51,7 +57,9 @@ public enum StorybookLaunchRequest: Equatable, Sendable {
   /// Pass `--storybook` to open the catalog or place a page name immediately
   /// after it. Use `--storybook-name=<page-name>` for an empty or hyphen-led
   /// name. Use `--storybook-file` and `--storybook-line` to disambiguate
-  /// duplicate names. Every supported argument may appear at most once.
+  /// duplicate names, and `--storybook-fullscreen` after a page name to open
+  /// it without Storybook's navigation presentation. Every supported argument
+  /// may appear at most once.
   ///
   /// - Parameter arguments: The process arguments, including unrelated host
   ///   application arguments.
@@ -82,6 +90,7 @@ public enum StorybookLaunchRequest: Equatable, Sendable {
       Self.storybookArgument,
       Self.fileArgument,
       Self.lineArgument,
+      Self.fullScreenArgument,
     ] where arguments.filter({ $0 == argument }).count > 1 {
       self = .invalid(
         .init(message: "\(argument) may only be specified once.")
@@ -156,6 +165,12 @@ public enum StorybookLaunchRequest: Equatable, Sendable {
         )
         return
       }
+      if arguments.contains(Self.fullScreenArgument) {
+        self = .invalid(
+          .init(message: "\(Self.fullScreenArgument) requires a page name.")
+        )
+        return
+      }
 
       self = .catalog
       return
@@ -168,21 +183,24 @@ public enum StorybookLaunchRequest: Equatable, Sendable {
       return
     }
 
+    let selector: BookPageSelector
     if let fileID {
       if let line {
-        self = .page(
-          .init(
-            name: name,
-            fileID: fileID,
-            normalizedLine: line
-          )
+        selector = .init(
+          name: name,
+          fileID: fileID,
+          normalizedLine: line
         )
       } else {
-        self = .page(.init(name: name, fileID: fileID))
+        selector = .init(name: name, fileID: fileID)
       }
     } else {
-      self = .page(.init(name: name))
+      selector = .init(name: name)
     }
+
+    self = arguments.contains(Self.fullScreenArgument)
+      ? .fullScreenPage(selector)
+      : .page(selector)
   }
 
   private static func optionalPageName(

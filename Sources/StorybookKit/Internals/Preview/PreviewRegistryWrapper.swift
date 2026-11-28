@@ -54,21 +54,13 @@ struct PreviewRegistryWrapper: Comparable {
         return {
           VStack {
             AnyView(makeBody())
-              .toolbar {
-                ToolbarItem(placement: sourceLocationPlacement) {
-                  Menu {
-                    Button {
-                      copySourceLocation()
-                    } label: {
-                      Text("\(fileID):\(line)")
-                        .font(.caption.monospacedDigit())
-                    }
-                  } label: {
-                    Image(systemName: "info.circle")
-                  }
-
-                }
-              }
+              .modifier(
+                PreviewSourceLocationToolbar(
+                  fileID: fileID,
+                  line: line,
+                  placement: sourceLocationPlacement
+                )
+              )
           }
         }
 
@@ -185,21 +177,13 @@ struct PreviewRegistryWrapper: Comparable {
       return {
         VStack {
           AnyView(makeBody())
-            .toolbar {
-              ToolbarItem(placement: sourceLocationPlacement) {
-                Menu {
-                  Button {
-                    copySourceLocation()
-                  } label: {
-                    Text("\(fileID):\(line)")
-                      .font(.caption.monospacedDigit())
-                  }
-                } label: {
-                  Image(systemName: "info.circle")
-                }
-
-              }
-            }
+            .modifier(
+              PreviewSourceLocationToolbar(
+                fileID: fileID,
+                line: line,
+                placement: sourceLocationPlacement
+              )
+            )
         }
       }
 
@@ -258,16 +242,12 @@ struct PreviewRegistryWrapper: Comparable {
     case "SwiftUI.ViewPreviewSource": // iOS 17 / macOS 14
       let makeView: MakeFunctionWrapper<any SwiftUI.View> = .init(source["makeView"])
       return {
-        VStack {
-          if let title, !title.isEmpty {
-            Text(title)
-              .font(.system(size: 17, weight: .semibold))
-          }
-          AnyView(makeView())
-          Text("\(fileID):\(line)")
-            .font(.caption.monospacedDigit())
-          BookSpacer(height: 16)
-        }
+        LegacySwiftUIPreviewMetadata(
+          title: title,
+          fileID: fileID,
+          line: line,
+          content: AnyView(makeView())
+        )
       }
 
     #if canImport(UIKit)
@@ -508,8 +488,7 @@ struct PreviewRegistryWrapper: Comparable {
   }
 
   @MainActor
-  private func copySourceLocation() {
-    let location = "\(fileID):\(line)"
+  private static func copySourceLocation(_ location: String) {
     #if canImport(UIKit)
     UIPasteboard.general.string = location
     #elseif canImport(AppKit)
@@ -652,5 +631,72 @@ struct PreviewRegistryWrapper: Comparable {
       return _openExistential(closure, do: invoke)
     }
 
+  }
+
+  private struct PreviewSourceLocationToolbar: ViewModifier {
+
+    @Environment(\.storybook_isFullScreenPresentation) private var isFullScreenPresentation
+
+    private let fileID: String
+    private let line: Int
+    private let placement: ToolbarItemPlacement
+
+    init(
+      fileID: String,
+      line: Int,
+      placement: ToolbarItemPlacement
+    ) {
+      self.fileID = fileID
+      self.line = line
+      self.placement = placement
+    }
+
+    func body(content: Content) -> some View {
+      content.toolbar {
+        if isFullScreenPresentation == false {
+          ToolbarItem(placement: placement) {
+            Menu {
+              Button {
+                PreviewRegistryWrapper.copySourceLocation("\(fileID):\(line)")
+              } label: {
+                Text("\(fileID):\(line)")
+                  .font(.caption.monospacedDigit())
+              }
+            } label: {
+              Image(systemName: "info.circle")
+            }
+          }
+        }
+      }
+    }
+  }
+
+  private struct LegacySwiftUIPreviewMetadata: View {
+
+    @Environment(\.storybook_isFullScreenPresentation)
+    private var isFullScreenPresentation
+
+    let title: String?
+    let fileID: String
+    let line: Int
+    let content: AnyView
+
+    @ViewBuilder
+    var body: some View {
+      if isFullScreenPresentation {
+        content
+      } else {
+        VStack {
+          if let title, !title.isEmpty {
+            Text(title)
+              .font(.system(size: 17, weight: .semibold))
+          }
+          content
+          Text("\(fileID):\(line)")
+            .font(.caption.monospacedDigit())
+          BookSpacer(height: 16)
+        }
+      }
+    }
   }
 }

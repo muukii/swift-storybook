@@ -54,6 +54,10 @@ private func issueUniqueNumber() -> Int {
 /// A component that displays a disclosure view.
 public struct BookPage: BookView, Identifiable, Sendable {
 
+  #if canImport(UIKit)
+  @Environment(\.storybook_openFullScreenPage) private var openFullScreenPage
+  #endif
+
   public nonisolated var id: DeclarationIdentifier {
     declarationIdentifier
   }
@@ -109,7 +113,26 @@ public struct BookPage: BookView, Identifiable, Sendable {
   }
 
   public var body: some View {
+    #if canImport(UIKit) && !targetEnvironment(macCatalyst)
+    if let openFullScreenPage {
+      pageLink
+        .contextMenu {
+          Button {
+            openFullScreenPage(self)
+          } label: {
+            Label("Open Fullscreen", systemImage: "arrow.up.left.and.arrow.down.right")
+          }
+          .accessibilityIdentifier("storybook.page.openFullscreen")
+        }
+    } else {
+      pageLink
+    }
+    #else
+    pageLink
+    #endif
+  }
 
+  private var pageLink: some View {
     NavigationLink {
       BookPageDestination(page: self)
     } label: {
@@ -118,13 +141,7 @@ public struct BookPage: BookView, Identifiable, Sendable {
         fileID: descriptor.fileID,
         line: descriptor.line
       )
-      //        .contextMenu(menuItems: {
-      //          Text(title)
-      //        }) {
-      //          destination
-      //        }
     }
-
   }
 }
 
@@ -144,6 +161,11 @@ enum StorybookViewPortPreview {
 /// Renders one page consistently for catalog links and programmable navigation.
 struct BookPageDestination: View {
 
+  enum Presentation {
+    case push
+    case fullScreen
+  }
+
   @Environment(\.bookContext) private var context
   @Environment(\.appearanceContext) private var appearanceContext
 
@@ -154,43 +176,64 @@ struct BookPageDestination: View {
     .primaryAction
     #endif
   }
+
+  private var isFullScreenPresentation: Bool {
+    switch presentation {
+    case .push: false
+    case .fullScreen: true
+    }
+  }
     
   let page: BookPage
+  var presentation: Presentation = .push
 
-  var body: some View {
-    Group {
-      if page.usesScrollView {
-        ScrollView {
+  @ViewBuilder
+  private var presentationContent: some View {
+    switch presentation {
+    case .push:
+      Group {
+        if page.usesScrollView {
+          ScrollView {
+            Display(content: page.destination)
+          }
+        } else {
           Display(content: page.destination)
         }
-      } else {
-        Display(content: page.destination)
       }
-    }
-    .frame(maxWidth: .infinity, maxHeight: .infinity)
-    #if canImport(UIKit)
-    .background(Color(uiColor: .systemBackground))
-    #else
-    .background(Color(nsColor: .windowBackgroundColor))
-    #endif
-    .accessibilityIdentifier(page.descriptor.accessibilityIdentifier)
-    .listStyle(.plain)
-    .navigationTitle(page.title)
-    #if canImport(UIKit)
-    .navigationBarTitleDisplayMode(.inline)
-    #endif
-    .toolbar {
-      if let appearanceContext {
-        ToolbarItem(placement: appearanceToolbarPlacement) {
-          AppearanceButton(context: appearanceContext)
-            .accessibilityIdentifier("storybook.page.appearance.toggle")
+      .listStyle(.plain)
+      .navigationTitle(page.title)
+      #if canImport(UIKit)
+      .navigationBarTitleDisplayMode(.inline)
+      #endif
+      .toolbar {
+        if let appearanceContext {
+          ToolbarItem(placement: appearanceToolbarPlacement) {
+            AppearanceButton(context: appearanceContext)
+              .accessibilityIdentifier("storybook.page.appearance.toggle")
+          }
         }
       }
+    case .fullScreen:
+      Display(content: page.destination)
     }
-    
-    .onAppear {
-      context?.onOpen(pageID: page.id)
-    }
+  }
+
+  var body: some View {
+    presentationContent
+      .environment(
+        \.storybook_isFullScreenPresentation,
+        isFullScreenPresentation
+      )
+      .frame(maxWidth: .infinity, maxHeight: .infinity)
+      #if canImport(UIKit)
+      .background(Color(uiColor: .systemBackground))
+      #else
+      .background(Color(nsColor: .windowBackgroundColor))
+      #endif
+      .accessibilityIdentifier(page.descriptor.accessibilityIdentifier)
+      .onAppear {
+        context?.onOpen(pageID: page.id)
+      }
   }
 }
 

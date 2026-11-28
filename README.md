@@ -247,11 +247,42 @@ The standard arguments are:
 --storybook
 --storybook <page-name>
 --storybook --storybook-name=<page-name>
+--storybook <page-name> --storybook-fullscreen
 --storybook <page-name> --storybook-file <module/file.swift>
 --storybook <page-name> --storybook-file <module/file.swift> --storybook-line <line>
+--storybook <page-name> --storybook-fullscreen --storybook-file <module/file.swift> --storybook-line <line>
 ```
 
 `--storybook` opens the catalog. Supply each token above as a distinct process argument; a page name containing spaces remains one argument. The positional form is convenient for ordinary names; use the single argument `--storybook-name=<page-name>` when the exact name is empty or begins with `-`. A name-only page request succeeds only when exactly one page has that name. Add the compiler-emitted `#fileID`, then the declaration line when necessary, to disambiguate duplicate names. Supplied page names and file identifiers are matched by their original UTF-8 bytes, without trimming, Unicode normalization, case folding, fuzzy search, or order-dependent fallback. Not-found and ambiguous requests remain visible in Storybook with candidate source locations and reusable launch-argument entries instead of opening another page. Pages that share the same name, file ID, and line must be given a unique declaration name or source location; Storybook does not choose between indistinguishable declarations.
+
+Add `--storybook-fullscreen` after a page name to open that page without Storybook's navigation presentation. On iOS and iPadOS, this uses a full-screen cover and displays the preview without Storybook's `NavigationStack`, title, appearance toolbar, or outer scrolling container; a preview-owned `NavigationStack` then supplies its own navigation and toolbar. Existing page requests continue to use push navigation. On Mac Catalyst, this argument intentionally falls back to the existing push navigation. On macOS, the request selects the page in the existing sidebar detail view.
+
+On iOS and iPadOS, the fullscreen preview has a draggable circular control near the lower trailing edge. Drag it to move; it follows the finger and springs to the nearest screen edge when released. Tapping it opens a native action sheet with **Return to Catalog** and, when UIKit provides one for the presentation context, **Cancel**. Returning closes the fullscreen preview and presentations it opened; choosing Cancel when available or dismissing outside the sheet preserves the same preview and its state. The control uses a temporary, non-key, transparent pass-through window in the preview's existing scene. Storybook does not replace or subclass the host window, take key-window status, or intercept touches outside the control, so ordinary SwiftUI `WindowGroup` hosts work without additional setup and Preview-owned input remains native. Its safe-area bounds avoid a docked keyboard; floating or undocked keyboards do not reposition the control.
+
+From the catalog, long-press a page row and choose **Open Fullscreen** to open it without relaunching. The catalog, search text, and navigation state remain underneath the cover. Opening from the catalog ends active catalog text editing without clearing the query or resetting the scroll position. Mac Catalyst keeps its existing push-navigation fallback and does not show **Open Fullscreen**; macOS continues to use the sidebar detail view.
+
+The iOS demo includes `#Preview("Navigation Stack Fullscreen")` in `Development/SwiftUIDemoApp/Component.swift` for checking a preview-owned stack and toolbar. Launch it with these distinct arguments:
+
+```text
+--storybook
+Navigation Stack Fullscreen
+--storybook-fullscreen
+--storybook-file
+SwiftUIDemoApp/Component.swift
+--storybook-line
+58
+```
+
+The expected page identifier is `storybook.page|27:Navigation Stack Fullscreen|30:SwiftUIDemoApp/Component.swift|58`.
+
+The `#Preview("Fullscreen Shake Interaction")` fixture at `SwiftUIDemoApp/Component.swift:80` has a text input and Preview-owned sheet for checking input ownership, child presentations, and the floating control. Its expected page marker is `storybook.page|28:Fullscreen Shake Interaction|30:SwiftUIDemoApp/Component.swift|80`.
+
+Two colored fixtures isolate safe-area rendering. `Fullscreen Safe Area Plain` checks edge-to-edge indigo behind content positioned inside the safe area. `Fullscreen Safe Area Navigation Stack` uses teal on the root and pink on a pushed detail, with safe-area markers and toolbar actions on both. Their selectors and page markers are:
+
+- `Fullscreen Safe Area Plain`: `storybook.page|26:Fullscreen Safe Area Plain|30:SwiftUIDemoApp/Component.swift|203`
+- `Fullscreen Safe Area Navigation Stack`: `storybook.page|37:Fullscreen Safe Area Navigation Stack|30:SwiftUIDemoApp/Component.swift|207`
+
+Use `--storybook-fullscreen` with either selector, inspect the top and bottom color edges and safe-area labels, then push the detail in the NavigationStack fixture and repeat the check.
 
 After a page opens, its root exposes a deterministic accessibility identifier in this form:
 

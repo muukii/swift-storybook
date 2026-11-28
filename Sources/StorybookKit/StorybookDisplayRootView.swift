@@ -52,6 +52,12 @@ public struct StorybookDisplayRootView: View {
       initialPresentation = .catalog
     case .page(let selector):
       initialPresentation = Self.resolve(selector, in: bookStore)
+    case .fullScreenPage(let selector):
+      initialPresentation = Self.resolve(
+        selector,
+        in: bookStore,
+        fullScreen: true
+      )
     case .invalid(let diagnostic):
       initialPresentation = .failure(.invalid(diagnostic))
     }
@@ -75,10 +81,12 @@ public struct StorybookDisplayRootView: View {
   @MainActor
   private static func resolve(
     _ selector: BookPageSelector,
-    in store: BookStore
+    in store: BookStore,
+    fullScreen: Bool = false
   ) -> BookInitialPresentation {
     do {
-      return .page(try store.resolve(selector))
+      let page = try store.resolve(selector)
+      return fullScreen ? .fullScreenPage(page) : .page(page)
     } catch let error as BookPageResolutionError {
       return .failure(.resolution(error))
     } catch {
@@ -111,6 +119,7 @@ private enum BookInitialPresentation {
   case automaticCatalog
   case catalog
   case page(BookPage)
+  case fullScreenPage(BookPage)
   case failure(StorybookLaunchFailure)
 }
 
@@ -213,6 +222,27 @@ private struct BookContainer: View {
         initialPage: page,
         shouldAutoOpenLastPage: false
       )
+    case .fullScreenPage(let page):
+      #if os(macOS)
+      BookSidebarCatalogView(
+        store: store,
+        initialPage: page,
+        shouldAutoOpenLastPage: false
+      )
+      #elseif targetEnvironment(macCatalyst)
+      BookCatalogView(
+        store: store,
+        initialPage: page,
+        shouldAutoOpenLastPage: false
+      )
+      #else
+      BookCatalogView(
+        store: store,
+        initialPage: nil,
+        shouldAutoOpenLastPage: false,
+        initialFullScreenPage: page
+      )
+      #endif
     case .failure(let failure):
       StorybookLaunchFailureView(failure: failure)
     }
@@ -257,20 +287,35 @@ private struct BookCatalogView: View {
   @State private var result: [Book.Node] = []
   @State private var currentTask: Task<Void, Error>?
   @State private var showSettings: Bool = false
+  @State private var fullScreenPage: BookPage?
+  @State private var fullScreenControlSession = FullscreenControlSession()
   @State private var path: NavigationPath
 
   @Environment(\.storybook_targetViewController) private var targetViewController
 
   @State private var appearanceContext = AppearanceContext()
 
+  private var openFullScreenPageAction: (@MainActor (BookPage) -> Void)? {
+#if targetEnvironment(macCatalyst)
+    nil
+#else
+    return { page in
+      targetViewController?.view.window?.endEditing(true)
+      fullScreenPage = page
+    }
+#endif
+  }
+
   @MainActor
   init(
     store: BookStore,
     initialPage: BookPage?,
-    shouldAutoOpenLastPage: Bool
+    shouldAutoOpenLastPage: Bool,
+    initialFullScreenPage: BookPage? = nil
   ) {
     self.store = store
     self.shouldAutoOpenLastPage = shouldAutoOpenLastPage
+    self._fullScreenPage = .init(initialValue: initialFullScreenPage)
 
     var initialPath = NavigationPath()
     if let initialPage {
@@ -345,6 +390,25 @@ private struct BookCatalogView: View {
           .frame(minWidth: 400, minHeight: 220)
           #endif
       }
+    }
+    .environment(\.storybook_openFullScreenPage, openFullScreenPageAction)
+    .fullScreenCover(
+      item: $fullScreenPage,
+      onDismiss: { fullScreenControlSession.deactivate() }
+    ) { page in
+      _ViewControllerHost {
+        _FullScreenPageViewController(
+          content:
+            BookPageDestination(page: page, presentation: .fullScreen)
+              .environment(\.bookContext, store)
+              .environment(\.appearanceContext, appearanceContext),
+          controlSession: fullScreenControlSession,
+          onReturnToCatalog: {
+            fullScreenPage = nil
+          }
+        )
+      }
+      .ignoresSafeArea()
     }
     .environment(\.bookContext, store)
     .environment(\.appearanceContext, appearanceContext)
@@ -465,7 +529,7 @@ private struct SearchResultNodeView: View {
 }
 
 #if canImport(UIKit)
-final class _ViewController<Content: View>: UIViewController {
+class _ViewController<Content: View>: UIViewController {
 
   private let content: Content
 
@@ -482,9 +546,7 @@ final class _ViewController<Content: View>: UIViewController {
     super.viewDidLoad()
 
     let hosting = UIHostingController(
-      rootView:
-        content
-        .environment(\.storybook_targetViewController, self)
+      rootView: content._storybookTargetViewController(StorybookControllerReference(self))
     )
 
     addChild(hosting)
@@ -502,6 +564,90 @@ final class _ViewController<Content: View>: UIViewController {
 
   }
 
+}
+
+private final class _FullScreenPageViewController<Content: View>: _ViewController<Content> {
+
+  private let onReturnToCatalog: @MainActor () -> Void
+  private let controlSession: FullscreenControlSession
+  private var hasReturnedToCatalog = false
+
+  init(
+    content: Content,
+    controlSession: FullscreenControlSession,
+    onReturnToCatalog: @escaping @MainActor () -> Void
+  ) {
+    self.onReturnToCatalog = onReturnToCatalog
+    self.controlSession = controlSession
+    super.init(content: content)
+  }
+
+  required init?(coder: NSCoder) {
+    fatalError("init(coder:) has not been implemented")
+  }
+
+  override func viewDidAppear(_ animated: Bool) {
+    super.viewDidAppear(animated)
+    controlSession.activate(window: view.window) { [weak self] sourceView in
+      self?.presentReturnMenu(from: sourceView)
+    }
+  }
+
+  private func presentReturnMenu(from sourceView: UIView) {
+    guard hasReturnedToCatalog == false,
+      let window = view.window
+    else { return }
+
+    let presenter = topmostViewController(from: self, in: window)
+    guard !(presenter is UIAlertController),
+      presenter.viewIfLoaded?.window === window,
+      presenter.presentedViewController == nil,
+      presenter.isBeingDismissed == false,
+      presenter.isBeingPresented == false
+    else {
+      return
+    }
+
+    let menu = UIAlertController(title: nil, message: nil, preferredStyle: .actionSheet)
+    menu.addAction(
+      UIAlertAction(title: "Return to Catalog", style: .destructive) { [weak self] _ in
+        guard let self else { return }
+        self.hasReturnedToCatalog = true
+        self.controlSession.deactivate()
+        self.onReturnToCatalog()
+      }
+    )
+    menu.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+
+    if let popover = menu.popoverPresentationController,
+      let overlayWindow = sourceView.window,
+      let presenterWindow = presenter.viewIfLoaded?.window
+    {
+      let rectInOverlayWindow = sourceView.convert(sourceView.bounds, to: nil)
+      let rectInPresenterWindow = overlayWindow.convert(rectInOverlayWindow, to: presenterWindow)
+      popover.sourceView = presenter.view
+      popover.sourceRect = presenter.view.convert(rectInPresenterWindow, from: presenterWindow)
+    }
+
+    presenter.present(menu, animated: true)
+  }
+
+  private func topmostViewController(from controller: UIViewController, in window: UIWindow)
+    -> UIViewController
+  {
+    if let presented = controller.presentedViewController,
+      presented.isBeingDismissed == false
+    {
+      return topmostViewController(from: presented, in: window)
+    }
+
+    for child in controller.children.reversed() {
+      guard child.viewIfLoaded?.window === window else { continue }
+      return topmostViewController(from: child, in: window)
+    }
+
+    return controller
+  }
 }
 
 @available(iOS 26, *)

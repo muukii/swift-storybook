@@ -32,6 +32,38 @@ struct StorybookLaunchRequestTests {
     )
   }
 
+  @Test("A full-screen page request preserves its exact selector")
+  func fullScreenPageRequest() {
+    #expect(
+      StorybookLaunchRequest(
+        arguments: [
+          "ExampleApp", "--storybook", "Navigation Stack Fullscreen",
+          "--storybook-fullscreen", "--storybook-file", "Demo/Component.swift",
+          "--storybook-line", "42",
+        ]
+      )
+        == .fullScreenPage(
+          .init(
+            name: "Navigation Stack Fullscreen",
+            fileID: "Demo/Component.swift",
+            line: 42
+          )
+        )
+    )
+  }
+
+  @Test("A full-screen request requires a page name")
+  func fullScreenRequestRequiresPage() {
+    #expect(
+      StorybookLaunchRequest(
+        arguments: ["ExampleApp", "--storybook", "--storybook-fullscreen"]
+      )
+        == .invalid(
+          .init(message: "--storybook-fullscreen requires a page name.")
+        )
+    )
+  }
+
   @Test("The explicit name form preserves empty and hyphen-led names")
   func explicitPageName() {
     #expect(
@@ -135,6 +167,7 @@ struct StorybookLaunchRequestTests {
       StorybookLaunchRequest.storybookArgument,
       StorybookLaunchRequest.fileArgument,
       StorybookLaunchRequest.lineArgument,
+      StorybookLaunchRequest.fullScreenArgument,
     ]
   )
   func duplicateArgument(argument: String) {
@@ -142,6 +175,8 @@ struct StorybookLaunchRequestTests {
     switch argument {
     case StorybookLaunchRequest.storybookArgument:
       arguments = ["ExampleApp", argument, argument]
+    case StorybookLaunchRequest.fullScreenArgument:
+      arguments = ["ExampleApp", "--storybook", "Page", argument, argument]
     case StorybookLaunchRequest.fileArgument:
       arguments = [
         "ExampleApp", "--storybook", "Page", argument, "A.swift", argument, "B.swift",
